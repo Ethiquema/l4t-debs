@@ -11,18 +11,13 @@ on:
 
 permissions:
   contents: write
-  pages: write
-  id-token: write
-
-concurrency:
-  group: "pages"
-  cancel-in-progress: false
 
 jobs:
   check-updates:
     runs-on: ubuntu-latest
     outputs:
       should_update: ${{ steps.check.outputs.should_update }}
+      deb_files: ${{ steps.list.outputs.deb_files }}
     steps:
       - name: Checkout this repo
         uses: actions/checkout@v4
@@ -50,64 +45,62 @@ jobs:
             echo "No changes, skipping update"
           fi
 
-          # Store for next job
-          echo "$LATEST_COMMIT" > /tmp/l4t-commit
-          echo "l4t_commit=$LATEST_COMMIT" >> $GITHUB_OUTPUT
+          echo "$LATEST_COMMIT" > .l4t-debs-commit
 
-      - name: Upload commit file
+      - name: Clone l4t-debs and list packages
+        if: steps.check.outputs.should_update == 'true'
+        id: list
+        run: |
+          git clone --depth 1 https://github.com/theofficialgman/l4t-debs.git /tmp/l4t-debs
+          # List all .deb files as JSON array
+          DEB_FILES=$(find /tmp/l4t-debs -name "*.deb" -printf '%f\n' | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          echo "deb_files=$DEB_FILES" >> $GITHUB_OUTPUT
+          echo "Found .deb files: $DEB_FILES"
+          # Copy to workspace for upload
+          mkdir -p debs
+          find /tmp/l4t-debs -name "*.deb" -exec cp {} debs/ \;
+
+      - name: Upload .deb files
         if: steps.check.outputs.should_update == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: l4t-commit
-          path: /tmp/l4t-commit
+          name: deb-packages
+          path: debs/
 
-  build-apt-repo:
-    needs: check-updates
-    if: needs.check-updates.outputs.should_update == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout this repo
-        uses: actions/checkout@v4
-
-      - name: Download commit file
-        uses: actions/download-artifact@v4
-        with:
-          name: l4t-commit
-
-      - name: Clone l4t-debs
+      - name: Save commit tracker
+        if: steps.check.outputs.should_update == 'true'
         run: |
-          git clone --depth 1 https://github.com/theofficialgman/l4t-debs.git /tmp/l4t-debs
-          mkdir -p apt-repo
-          find /tmp/l4t-debs -name "*.deb" -exec cp {} apt-repo/ \;
-          cp /tmp/l4t-debs/pgp-key.public apt-repo/
-
-      - name: Build APT repository
-        uses: MauroDruwel/apt-repo-action@v4
-        with:
-          repo_path: apt-repo
-          codename: noble
-          architectures: arm64
-          components: main
-          gpg_private_key: ${{ secrets.APT_GPG_PRIVATE_KEY }}
-          gpg_passphrase: ${{ secrets.APT_GPG_PASSPHRASE }}
-
-      - name: Setup Pages
-        uses: actions/configure-pages@v4
-
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: apt-repo
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
-
-      - name: Update stored commit
-        run: |
-          mv l4t-commit .l4t-debs-commit
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add .l4t-debs-commit
           git commit -m "Update l4t-debs commit tracker" || echo "No changes to commit"
           git push
+
+  add-packages:
+    needs: check-updates
+    if: needs.check-updates.outputs.should_update == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        deb: ${{ fromJson(needs.check-updates.outputs.deb_files) }}
+      max-parallel: 1
+    steps:
+      - name: Download .deb files
+        uses: actions/download-artifact@v4
+        with:
+          name: deb-packages
+          path: debs/
+
+      - name: Add ${{ matrix.deb }} to APT repository
+        uses: MauroDruwel/apt-repo-action@v4
+        with:
+          github_token: ${{ secrets.PAT }}
+          repo_supported_arch: arm64
+          repo_supported_version: noble
+          file: debs/${{ matrix.deb }}
+          file_target_version: noble
+          public_key: ${{ secrets.PUBLIC }}
+          private_key: ${{ secrets.PRIVATE }}
+          key_passphrase: ${{ secrets.SECRET }}
+          target_repository: Ethiquema/l4t-debs
+          page_branch: gh-pages
