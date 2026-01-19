@@ -1,0 +1,24 @@
+Origin: Ethiquema L4T Repository
+Label: l4t-debs
+Suite: noble
+Codename: noble
+Architectures: arm64
+Components: main
+Description: L4T kernel packages for Nintendo Switch
+Date: Mon, 19 Jan 2026 19:44:55 +0000
+MD5Sum:
+ 948ebf4237ba4833b5b2c5be3a3d7255              207 Release
+ 3431111d9b45e454f33abc8b38a070ef           202112 main/binary-arm64/Packages
+ 21b91a8a32d30b9d343583ce4f4cddb6            52428 main/binary-arm64/Packages.gz
+SHA1:
+ 05ec4adeff0490695bfa4a011bf86ec1c9dd34a8              207 Release
+ 23893a46f41a7b55f43cb2cea35fe7c3b2cfbb9f           202112 main/binary-arm64/Packages
+ af3c219cc9667c4802388db2c8c417571cd9fc97            52428 main/binary-arm64/Packages.gz
+SHA256:
+ 0d983856aad2413fd7524250d6b1f1cb81391e3a6f5a7341a4baab4e072893c6              207 Release
+ 783327bad63b36349734517a965c5c2ce5423dac1de6b4809a8a26be9871b39d           202112 main/binary-arm64/Packages
+ 0340539e813ba6862cf1a5acff6b2c9895ddd0ddf439332b11a9b57eaa207103            52428 main/binary-arm64/Packages.gz
+SHA512:
+ c3c14b4ca972a93ec9645e137b01999bed1ec6119ef288547a02abcc5baa4d7ef761da16170771ce73f28f259f3349eacacc48a99507e04b0486cd8e91add843              207 Release
+ 597dd8da4afbe3a92220550a2c74dbf46e4fdc70a0f4d388f3b7f7b32166f4ecddf2814f1b8223c20429e1c8493a455504bab6a5236efb7accfb6c1262bff069           202112 main/binary-arm64/Packages
+ a80c37dcccf3d8b3cad66a84b02956e746b0fb5c7644854dc954b692a377c3e6f3ed09aa2e5fbdaa87110f963241d6b13784569f6ea86173856c322590609779            52428 main/binary-arm64/Packages.gz
