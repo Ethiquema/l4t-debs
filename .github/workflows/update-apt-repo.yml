@@ -52,13 +52,19 @@ jobs:
         id: list
         run: |
           git clone --depth 1 https://github.com/theofficialgman/l4t-debs.git /tmp/l4t-debs
-          # List all .deb files as JSON array
-          DEB_FILES=$(find /tmp/l4t-debs -name "*.deb" -printf '%f\n' | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          mkdir -p debs
+
+          # Copy and rename files (replace : with _ for artifact compatibility)
+          for f in $(find /tmp/l4t-debs -name "*.deb"); do
+            filename=$(basename "$f")
+            safename="${filename//:/_}"
+            cp "$f" "debs/$safename"
+          done
+
+          # List renamed .deb files as JSON array
+          DEB_FILES=$(ls debs/*.deb 2>/dev/null | xargs -n1 basename | jq -R -s -c 'split("\n") | map(select(length > 0))')
           echo "deb_files=$DEB_FILES" >> $GITHUB_OUTPUT
           echo "Found .deb files: $DEB_FILES"
-          # Copy to workspace for upload
-          mkdir -p debs
-          find /tmp/l4t-debs -name "*.deb" -exec cp {} debs/ \;
 
       - name: Upload .deb files
         if: steps.check.outputs.should_update == 'true'
