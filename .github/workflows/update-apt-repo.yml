@@ -17,6 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       should_update: ${{ steps.check.outputs.should_update }}
+      has_new_debs: ${{ steps.list.outputs.has_new_debs }}
       deb_files: ${{ steps.list.outputs.deb_files }}
     steps:
       - name: Checkout this repo
@@ -47,44 +48,75 @@ jobs:
 
           echo "$LATEST_COMMIT" > .l4t-debs-commit
 
-      - name: Clone l4t-debs and list packages
+      - name: Clone l4t-debs and find new/changed packages
         if: steps.check.outputs.should_update == 'true'
         id: list
         run: |
           git clone --depth 1 https://github.com/theofficialgman/l4t-debs.git /tmp/l4t-debs
           mkdir -p debs
 
-          # Copy and rename files (replace : with _ for artifact compatibility)
+          # Load existing hashes (if any)
+          declare -A OLD_HASHES
+          if [ -f .deb-hashes ]; then
+            while IFS='=' read -r name hash; do
+              OLD_HASHES["$name"]="$hash"
+            done < .deb-hashes
+          fi
+
+          # Compute new hashes and find changed/new files
+          NEW_DEBS=""
+          > .deb-hashes.new
+
           for f in $(find /tmp/l4t-debs -name "*.deb"); do
             filename=$(basename "$f")
             safename="${filename//:/_}"
-            cp "$f" "debs/$safename"
+            hash=$(sha256sum "$f" | cut -d' ' -f1)
+
+            echo "${safename}=${hash}" >> .deb-hashes.new
+
+            # Check if new or changed
+            if [ "${OLD_HASHES[$safename]}" != "$hash" ]; then
+              cp "$f" "debs/$safename"
+              if [ -n "$NEW_DEBS" ]; then
+                NEW_DEBS="${NEW_DEBS},\"${safename}\""
+              else
+                NEW_DEBS="\"${safename}\""
+              fi
+              echo "New/changed: $safename"
+            fi
           done
 
-          # List renamed .deb files as JSON array
-          DEB_FILES=$(ls debs/*.deb 2>/dev/null | xargs -n1 basename | jq -R -s -c 'split("\n") | map(select(length > 0))')
-          echo "deb_files=$DEB_FILES" >> $GITHUB_OUTPUT
-          echo "Found .deb files: $DEB_FILES"
+          mv .deb-hashes.new .deb-hashes
+
+          if [ -n "$NEW_DEBS" ]; then
+            echo "deb_files=[${NEW_DEBS}]" >> $GITHUB_OUTPUT
+            echo "has_new_debs=true" >> $GITHUB_OUTPUT
+            echo "Found new/changed packages: [${NEW_DEBS}]"
+          else
+            echo "deb_files=[]" >> $GITHUB_OUTPUT
+            echo "has_new_debs=false" >> $GITHUB_OUTPUT
+            echo "No new/changed packages"
+          fi
 
       - name: Upload .deb files
-        if: steps.check.outputs.should_update == 'true'
+        if: steps.list.outputs.has_new_debs == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: deb-packages
           path: debs/
 
-      - name: Save commit tracker
+      - name: Save trackers
         if: steps.check.outputs.should_update == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add .l4t-debs-commit
-          git commit -m "Update l4t-debs commit tracker" || echo "No changes to commit"
+          git add .l4t-debs-commit .deb-hashes
+          git commit -m "Update l4t-debs trackers" || echo "No changes to commit"
           git push
 
   add-packages:
     needs: check-updates
-    if: needs.check-updates.outputs.should_update == 'true'
+    if: needs.check-updates.outputs.has_new_debs == 'true'
     runs-on: ubuntu-latest
     strategy:
       matrix:
