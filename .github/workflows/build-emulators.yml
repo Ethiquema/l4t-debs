@@ -256,7 +256,7 @@ jobs:
                 libspeexdsp-dev libfmt-dev nlohmann-json3-dev libzstd-dev \
                 libusb-1.0-0-dev libhidapi-dev glslang-tools spirv-tools \
                 libboost-serialization-dev libcubeb-dev libenet-dev liblz4-dev \
-                dpkg-dev fakeroot
+                dpkg-dev fakeroot libwayland-dev
 
               cd /tmp
               git clone --depth 1 --branch "$VERSION" --recurse-submodules https://github.com/azahar-emu/azahar.git
@@ -273,15 +273,19 @@ jobs:
                 -DENABLE_QT_GUI=ON \
                 -DENABLE_SDL2_FRONTEND=ON \
                 -DENABLE_TESTS=OFF \
-                -DENABLE_WEB_SERVICE=OFF
+                -DENABLE_WEB_SERVICE=OFF \
+                -DENABLE_X11=OFF
 
               ninja -j$(nproc)
               DESTDIR=/tmp/pkg ninja install
 
+              # Clean version (remove v prefix)
+              VERSION_CLEAN=$(echo "$VERSION" | sed "s/^v//")
+
               mkdir -p /tmp/pkg/DEBIAN
               cat > /tmp/pkg/DEBIAN/control << EOF
           Package: azahar-emu-l4t
-          Version: ${VERSION}
+          Version: ${VERSION_CLEAN}
           Architecture: arm64
           Maintainer: Ethiquema <noreply@ethiquema.github.io>
           Depends: libc6, libqt6widgets6, libqt6gui6, libqt6core6, libqt6multimedia6, libqt6opengl6, libsdl2-2.0-0, libssl3t64, libavcodec60, libavformat60, libswscale7, libspeexdsp1, libfmt9, libzstd1, libusb-1.0-0, libhidapi-hidraw0, libboost-serialization1.83.0, libenet7, liblz4-1
@@ -294,7 +298,7 @@ jobs:
            This build is optimized for Nintendo Switch L4T with Vulkan support.
           EOF
 
-              dpkg-deb --build /tmp/pkg /workspace/azahar-emu-l4t_${VERSION}_arm64.deb
+              dpkg-deb --build /tmp/pkg /workspace/azahar-emu-l4t_${VERSION_CLEAN}_arm64.deb
             '
 
       - name: Build Dolphin from source
@@ -341,7 +345,8 @@ jobs:
               ninja -j$(nproc)
               DESTDIR=/tmp/pkg ninja install
 
-              PKG_VERSION="git-${SHORT_SHA}"
+              # Version must start with digit for dpkg
+              PKG_VERSION="0.0.0+git.${SHORT_SHA}"
               mkdir -p /tmp/pkg/DEBIAN
               cat > /tmp/pkg/DEBIAN/control << EOF
           Package: dolphin-emu-l4t
