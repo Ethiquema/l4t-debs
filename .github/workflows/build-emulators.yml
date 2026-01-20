@@ -11,102 +11,9 @@ on:
 permissions:
   contents: write
 
-concurrency:
-  group: apt-repo-update
-  cancel-in-progress: false
-
 jobs:
-  check-updates:
-    runs-on: ubuntu-24.04
-    outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix }}
-      has_builds: ${{ steps.set-matrix.outputs.has_builds }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          ref: main
-
-      - name: Check all emulators for updates
-        id: set-matrix
-        run: |
-          FORCE_BUILD=${{ github.event_name == 'push' }}
-          BUILDS="[]"
-
-          # Azahar - GitHub releases
-          AZAHAR_TAG=$(curl -fsSL https://api.github.com/repos/azahar-emu/azahar/releases/latest | jq -r '.tag_name')
-          AZAHAR_STORED=$(cat .azahar-version 2>/dev/null || echo "")
-          if [ "$AZAHAR_TAG" != "$AZAHAR_STORED" ] || [ "$FORCE_BUILD" = "true" ]; then
-            BUILDS=$(echo "$BUILDS" | jq -c '. + [{"name":"azahar","version":"'"$AZAHAR_TAG"'","type":"source"}]')
-          fi
-
-          # Dolphin - Git commits
-          DOLPHIN_COMMIT=$(curl -fsSL https://api.github.com/repos/dolphin-emu/dolphin/commits/master | jq -r '.sha')
-          DOLPHIN_SHORT=${DOLPHIN_COMMIT:0:7}
-          DOLPHIN_STORED=$(cat .dolphin-commit 2>/dev/null || echo "")
-          if [ "$DOLPHIN_COMMIT" != "$DOLPHIN_STORED" ] || [ "$FORCE_BUILD" = "true" ]; then
-            BUILDS=$(echo "$BUILDS" | jq -c '. + [{"name":"dolphin","version":"'"$DOLPHIN_COMMIT"'","short":"'"$DOLPHIN_SHORT"'","type":"source"}]')
-          fi
-
-          # DuckStation - GitHub releases (uses published date)
-          DUCK_INFO=$(curl -fsSL https://api.github.com/repos/stenzek/duckstation/releases/latest)
-          DUCK_PUBLISHED=$(echo "$DUCK_INFO" | jq -r '.published_at')
-          DUCK_URL=$(echo "$DUCK_INFO" | jq -r '.assets[] | select(.name | test("arm64.AppImage$")) | select(.name | test("Mini") | not) | .browser_download_url')
-          DUCK_STORED=$(cat .duckstation-version 2>/dev/null || echo "")
-          if [ "$DUCK_PUBLISHED" != "$DUCK_STORED" ] || [ "$FORCE_BUILD" = "true" ]; then
-            BUILDS=$(echo "$BUILDS" | jq -c '. + [{"name":"duckstation","version":"'"$DUCK_PUBLISHED"'","url":"'"$DUCK_URL"'","type":"appimage"}]')
-          fi
-
-          # EmulationStation-DE - GitLab releases
-          ESDE_TAG=$(curl -fsSL "https://gitlab.com/api/v4/projects/es-de%2Femulationstation-de/releases" | jq -r '.[0].tag_name')
-          ESDE_STORED=$(cat .esde-version 2>/dev/null || echo "")
-          if [ "$ESDE_TAG" != "$ESDE_STORED" ] || [ "$FORCE_BUILD" = "true" ]; then
-            BUILDS=$(echo "$BUILDS" | jq -c '. + [{"name":"esde","version":"'"$ESDE_TAG"'","url":"https://gitlab.com/es-de/emulationstation-de/-/package_files/248914983/download","type":"appimage"}]')
-          fi
-
-          # melonDS - GitHub releases
-          MELON_INFO=$(curl -fsSL https://api.github.com/repos/melonDS-emu/melonDS/releases/latest)
-          MELON_TAG=$(echo "$MELON_INFO" | jq -r '.tag_name')
-          MELON_URL=$(echo "$MELON_INFO" | jq -r '.assets[] | select(.name | test("appimage-aarch64.zip$")) | .browser_download_url')
-          MELON_STORED=$(cat .melonds-version 2>/dev/null || echo "")
-          if [ "$MELON_TAG" != "$MELON_STORED" ] || [ "$FORCE_BUILD" = "true" ]; then
-            BUILDS=$(echo "$BUILDS" | jq -c '. + [{"name":"melonds","version":"'"$MELON_TAG"'","url":"'"$MELON_URL"'","type":"appimage-zip"}]')
-          fi
-
-          # PPSSPP - GitHub releases
-          PPSSPP_INFO=$(curl -fsSL https://api.github.com/repos/hrydgard/ppsspp/releases/latest)
-          PPSSPP_TAG=$(echo "$PPSSPP_INFO" | jq -r '.tag_name')
-          PPSSPP_URL=$(echo "$PPSSPP_INFO" | jq -r '.assets[] | select(.name | test("aarch64.AppImage$")) | .browser_download_url')
-          PPSSPP_STORED=$(cat .ppsspp-version 2>/dev/null || echo "")
-          if [ "$PPSSPP_TAG" != "$PPSSPP_STORED" ] || [ "$FORCE_BUILD" = "true" ]; then
-            BUILDS=$(echo "$BUILDS" | jq -c '. + [{"name":"ppsspp","version":"'"$PPSSPP_TAG"'","url":"'"$PPSSPP_URL"'","type":"appimage"}]')
-          fi
-
-          # xemu - GitHub releases
-          XEMU_INFO=$(curl -fsSL https://api.github.com/repos/xemu-project/xemu/releases/latest)
-          XEMU_TAG=$(echo "$XEMU_INFO" | jq -r '.tag_name')
-          XEMU_URL=$(echo "$XEMU_INFO" | jq -r '.assets[] | select(.name | test("aarch64.AppImage$")) | select(.name | test("dbg") | not) | .browser_download_url')
-          XEMU_STORED=$(cat .xemu-version 2>/dev/null || echo "")
-          if [ "$XEMU_TAG" != "$XEMU_STORED" ] || [ "$FORCE_BUILD" = "true" ]; then
-            BUILDS=$(echo "$BUILDS" | jq -c '. + [{"name":"xemu","version":"'"$XEMU_TAG"'","url":"'"$XEMU_URL"'","type":"appimage"}]')
-          fi
-
-          echo "matrix={\"include\":$BUILDS}" >> $GITHUB_OUTPUT
-          if [ "$BUILDS" = "[]" ]; then
-            echo "has_builds=false" >> $GITHUB_OUTPUT
-            echo "No updates found"
-          else
-            echo "has_builds=true" >> $GITHUB_OUTPUT
-            echo "Builds to run: $BUILDS"
-          fi
-
   build:
-    needs: check-updates
-    if: needs.check-updates.outputs.has_builds == 'true'
     runs-on: ubuntu-24.04
-    strategy:
-      matrix: ${{ fromJson(needs.check-updates.outputs.matrix) }}
-      fail-fast: false
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -114,160 +21,146 @@ jobs:
           ref: main
 
       - name: Set up QEMU for ARM64
-        if: matrix.type == 'source'
         uses: docker/setup-qemu-action@v3
         with:
           platforms: arm64
 
-      # =========================================================================
-      # APPIMAGE REPACKAGING
-      # =========================================================================
-      - name: Build AppImage package
-        if: matrix.type == 'appimage' || matrix.type == 'appimage-zip'
+      - name: Fetch latest versions
+        id: versions
         run: |
-          set -e
-          NAME="${{ matrix.name }}"
-          VERSION="${{ matrix.version }}"
-          URL="${{ matrix.url }}"
+          # Azahar
+          AZAHAR_TAG=$(curl -fsSL https://api.github.com/repos/azahar-emu/azahar/releases/latest | jq -r '.tag_name')
+          echo "azahar_version=$AZAHAR_TAG" >> $GITHUB_OUTPUT
 
-          # Clean version for dpkg
-          # Remove 'v' prefix, convert ISO dates to YYYYMMDD format
-          VERSION_CLEAN=$(echo "$VERSION" | sed 's/^v//' | sed 's/^\([0-9]\{4\}\)-\([0-9]\{2\}\)-\([0-9]\{2\}\)T.*/\1\2\3/')
+          # Dolphin
+          DOLPHIN_COMMIT=$(curl -fsSL https://api.github.com/repos/dolphin-emu/dolphin/commits/master | jq -r '.sha')
+          echo "dolphin_commit=$DOLPHIN_COMMIT" >> $GITHUB_OUTPUT
+          echo "dolphin_short=${DOLPHIN_COMMIT:0:7}" >> $GITHUB_OUTPUT
 
-          # Download
-          if [ "${{ matrix.type }}" = "appimage-zip" ]; then
-            curl -fsSL -o archive.zip "$URL"
-            unzip archive.zip
-            APPIMAGE=$(ls *.AppImage)
-          else
-            curl -fsSL -o app.AppImage "$URL"
-            APPIMAGE="app.AppImage"
-          fi
-          chmod +x "$APPIMAGE"
+          # DuckStation
+          DUCK_COMMIT=$(curl -fsSL https://api.github.com/repos/stenzek/duckstation/commits/master | jq -r '.sha')
+          echo "duck_commit=$DUCK_COMMIT" >> $GITHUB_OUTPUT
+          echo "duck_short=${DUCK_COMMIT:0:7}" >> $GITHUB_OUTPUT
 
-          # Package config per emulator
-          PROVIDES=""
-          CONFLICTS=""
-          case "$NAME" in
-            duckstation)
-              PKG_NAME="duckstation-l4t"
-              BIN_NAME="duckstation"
-              APPIMAGE_NAME="DuckStation.AppImage"
-              DESKTOP_NAME="DuckStation"
-              DESKTOP_COMMENT="PlayStation 1 Emulator"
-              DESCRIPTION="DuckStation PS1 Emulator (ARM64 AppImage)"
-              ;;
-            esde)
-              PKG_NAME="emulationstation-de-l4t"
-              BIN_NAME="emulationstation"
-              APPIMAGE_NAME="EmulationStation-DE.AppImage"
-              DESKTOP_NAME="EmulationStation Desktop Edition"
-              DESKTOP_COMMENT="Emulator Frontend"
-              DESCRIPTION="EmulationStation Desktop Edition (ARM64 AppImage)"
-              PROVIDES="emulationstation"
-              CONFLICTS="emulationstation"
-              ;;
-            melonds)
-              PKG_NAME="melonds-l4t"
-              BIN_NAME="melonds"
-              APPIMAGE_NAME="melonDS.AppImage"
-              DESKTOP_NAME="melonDS"
-              DESKTOP_COMMENT="Nintendo DS Emulator"
-              DESCRIPTION="melonDS Nintendo DS Emulator (ARM64 AppImage)"
-              ;;
-            ppsspp)
-              PKG_NAME="ppsspp-l4t"
-              BIN_NAME="ppsspp"
-              APPIMAGE_NAME="PPSSPPSDL.AppImage"
-              DESKTOP_NAME="PPSSPP"
-              DESKTOP_COMMENT="PlayStation Portable Emulator"
-              DESCRIPTION="PPSSPP PlayStation Portable Emulator (ARM64 AppImage)"
-              PROVIDES="ppsspp"
-              CONFLICTS="ppsspp"
-              ;;
-            xemu)
-              PKG_NAME="xemu-l4t"
-              BIN_NAME="xemu"
-              APPIMAGE_NAME="xemu.AppImage"
-              DESKTOP_NAME="xemu"
-              DESKTOP_COMMENT="Original Xbox Emulator"
-              DESCRIPTION="xemu Original Xbox Emulator (ARM64 AppImage)"
-              ;;
-          esac
+          # EmulationStation-DE
+          ESDE_TAG=$(curl -fsSL "https://gitlab.com/api/v4/projects/es-de%2Femulationstation-de/releases" | jq -r '.[0].tag_name')
+          echo "esde_version=$ESDE_TAG" >> $GITHUB_OUTPUT
 
-          # Create .deb structure
-          mkdir -p pkg/DEBIAN pkg/usr/bin pkg/usr/share/applications
+          # melonDS
+          MELON_TAG=$(curl -fsSL https://api.github.com/repos/melonDS-emu/melonDS/releases/latest | jq -r '.tag_name')
+          echo "melonds_version=$MELON_TAG" >> $GITHUB_OUTPUT
 
-          mv "$APPIMAGE" "pkg/usr/bin/$APPIMAGE_NAME"
+          # PPSSPP
+          PPSSPP_TAG=$(curl -fsSL https://api.github.com/repos/hrydgard/ppsspp/releases/latest | jq -r '.tag_name')
+          echo "ppsspp_version=$PPSSPP_TAG" >> $GITHUB_OUTPUT
 
-          cat > "pkg/usr/bin/$BIN_NAME" << WRAPPER
-          #!/bin/bash
-          exec /usr/bin/$APPIMAGE_NAME "\$@"
-          WRAPPER
-          chmod +x "pkg/usr/bin/$BIN_NAME"
+          # xemu
+          XEMU_TAG=$(curl -fsSL https://api.github.com/repos/xemu-project/xemu/releases/latest | jq -r '.tag_name')
+          echo "xemu_version=$XEMU_TAG" >> $GITHUB_OUTPUT
 
-          cat > "pkg/usr/share/applications/${BIN_NAME}.desktop" << DESKTOP
-          [Desktop Entry]
-          Name=$DESKTOP_NAME
-          Comment=$DESKTOP_COMMENT
-          Exec=$BIN_NAME
-          Icon=$BIN_NAME
-          Terminal=false
-          Type=Application
-          Categories=Game;Emulator;
-          DESKTOP
-
-          # Build control file (only add Provides/Conflicts if set)
-          {
-            echo "Package: $PKG_NAME"
-            echo "Version: $VERSION_CLEAN"
-            echo "Architecture: arm64"
-            echo "Maintainer: Ethiquema <noreply@ethiquema.github.io>"
-            echo "Depends: libfuse2t64 | libfuse2"
-            [ -n "$PROVIDES" ] && echo "Provides: $PROVIDES"
-            [ -n "$CONFLICTS" ] && echo "Conflicts: $CONFLICTS"
-            echo "Section: games"
-            echo "Priority: optional"
-            echo "Description: $DESCRIPTION"
-            echo " Optimized for Nintendo Switch L4T."
-          } > pkg/DEBIAN/control
-
-          dpkg-deb --build pkg "${PKG_NAME}_${VERSION_CLEAN}_arm64.deb"
-
-      # =========================================================================
-      # SOURCE BUILDS (Azahar, Dolphin)
-      # =========================================================================
-      - name: Build Azahar from source
-        if: matrix.name == 'azahar'
+      - name: Create ARM64 container with all dependencies
         run: |
-          docker run --rm --platform linux/arm64 \
+          docker run --name emu-builder --platform linux/arm64 \
             -v ${{ github.workspace }}:/workspace \
-            -e VERSION=${{ matrix.version }} \
+            -e AZAHAR_VERSION=${{ steps.versions.outputs.azahar_version }} \
+            -e DOLPHIN_COMMIT=${{ steps.versions.outputs.dolphin_commit }} \
+            -e DOLPHIN_SHORT=${{ steps.versions.outputs.dolphin_short }} \
+            -e DUCK_COMMIT=${{ steps.versions.outputs.duck_commit }} \
+            -e DUCK_SHORT=${{ steps.versions.outputs.duck_short }} \
+            -e ESDE_VERSION=${{ steps.versions.outputs.esde_version }} \
+            -e MELONDS_VERSION=${{ steps.versions.outputs.melonds_version }} \
+            -e PPSSPP_VERSION=${{ steps.versions.outputs.ppsspp_version }} \
+            -e XEMU_VERSION=${{ steps.versions.outputs.xemu_version }} \
             ubuntu:24.04 bash -c '
               set -e
               export DEBIAN_FRONTEND=noninteractive
 
+              echo "=== Installing all build dependencies ==="
               apt-get update
               apt-get install -y \
-                build-essential cmake ninja-build git pkg-config \
+                build-essential cmake ninja-build git pkg-config meson dpkg-dev \
                 clang llvm libc++-dev libc++abi-dev \
-                qt6-base-dev qt6-multimedia-dev libqt6opengl6-dev \
-                libsdl2-dev libssl-dev libavcodec-dev libavformat-dev libswscale-dev \
-                libspeexdsp-dev libfmt-dev nlohmann-json3-dev libzstd-dev \
-                libusb-1.0-0-dev libhidapi-dev glslang-tools spirv-tools \
-                libboost-serialization-dev libcubeb-dev libenet-dev liblz4-dev \
-                dpkg-dev fakeroot libwayland-dev
+                python3 python3-pip python3-yaml \
+                libjemalloc-dev libwayland-dev \
+                qt6-base-dev qt6-base-private-dev qt6-multimedia-dev qt6-tools-dev \
+                libqt6opengl6-dev libqt6svg6-dev \
+                libsdl2-dev libsdl2-ttf-dev \
+                libavcodec-dev libavformat-dev libavutil-dev libswscale-dev \
+                libssl-dev libcurl4-openssl-dev \
+                libfmt-dev libzstd-dev libpng-dev liblz4-dev libbz2-dev \
+                libpugixml-dev nlohmann-json3-dev \
+                libusb-1.0-0-dev libhidapi-dev libevdev-dev \
+                libspeexdsp-dev glslang-tools spirv-tools \
+                libboost-serialization-dev libcubeb-dev libenet-dev \
+                libsfml-dev libminiupnpc-dev libmbedtls-dev \
+                libsystemd-dev libbluetooth-dev libasound2-dev libpulse-dev \
+                liblzo2-dev libxxhash-dev libspng-dev \
+                extra-cmake-modules \
+                libslirp-dev libarchive-dev \
+                libglew-dev libsnappy-dev libzip-dev \
+                libfreeimage-dev libfreetype-dev libvlc-dev libpoppler-cpp-dev \
+                libepoxy-dev libpixman-1-dev libgtk-3-dev \
+                libsamplerate0-dev libpcap-dev libglib2.0-dev
 
-              cd /tmp
-              git clone --depth 1 --branch "$VERSION" --recurse-submodules https://github.com/azahar-emu/azahar.git
-              cd azahar
-              mkdir build && cd build
+              echo "=== Cloning all repositories ==="
+
+              # Azahar
+              git clone --depth 1 --branch "$AZAHAR_VERSION" --recurse-submodules \
+                https://github.com/azahar-emu/azahar.git /src/azahar
+
+              # Dolphin
+              git clone https://github.com/dolphin-emu/dolphin.git /src/dolphin
+              cd /src/dolphin && git checkout "$DOLPHIN_COMMIT" && git submodule update --init --recursive
+
+              # DuckStation
+              git clone https://github.com/stenzek/duckstation.git /src/duckstation
+              cd /src/duckstation && git checkout "$DUCK_COMMIT" && git submodule update --init --recursive
+
+              # EmulationStation-DE
+              git clone --depth 1 --branch "$ESDE_VERSION" \
+                https://gitlab.com/es-de/emulationstation-de.git /src/esde
+
+              # melonDS
+              git clone --depth 1 --branch "$MELONDS_VERSION" \
+                https://github.com/melonDS-emu/melonDS.git /src/melonds
+
+              # PPSSPP
+              git clone --depth 1 --branch "$PPSSPP_VERSION" --recurse-submodules \
+                https://github.com/hrydgard/ppsspp.git /src/ppsspp
+
+              # xemu
+              git clone --depth 1 --branch "$XEMU_VERSION" \
+                https://github.com/xemu-project/xemu.git /src/xemu
+              cd /src/xemu && git submodule update --init --recursive
+
+              echo "=== Dependencies installed, repos cloned ==="
+            '
+          docker commit emu-builder emu-builder-image
+          docker rm emu-builder
+
+      # =========================================================================
+      # BUILD STEPS
+      # =========================================================================
+
+      - name: Build Azahar
+        continue-on-error: true
+        run: |
+          docker run --rm --platform linux/arm64 \
+            -v ${{ github.workspace }}:/workspace \
+            emu-builder-image bash -c '
+              set -e
+              echo "=== Building Azahar ==="
+              cd /src/azahar
+              mkdir -p build && cd build
               cmake .. -G Ninja \
                 -DCMAKE_BUILD_TYPE=Release \
                 -DCMAKE_INSTALL_PREFIX=/usr \
                 -DCMAKE_CXX_COMPILER=clang++ \
                 -DCMAKE_C_COMPILER=clang \
-                -DCMAKE_CXX_FLAGS="-mcpu=cortex-a57" \
+                -DCMAKE_C_FLAGS="-O3 -flto=thin -march=armv8-a+crc+simd -mtune=cortex-a57" \
+                -DCMAKE_CXX_FLAGS="-O3 -flto=thin -march=armv8-a+crc+simd -mtune=cortex-a57" \
+                -DCMAKE_EXE_LINKER_FLAGS="-ljemalloc" \
+                -DCMAKE_SHARED_LINKER_FLAGS="-ljemalloc" \
                 -DENABLE_VULKAN=ON \
                 -DENABLE_OPENGL=ON \
                 -DENABLE_QT_GUI=ON \
@@ -275,120 +168,368 @@ jobs:
                 -DENABLE_TESTS=OFF \
                 -DENABLE_WEB_SERVICE=OFF \
                 -DENABLE_X11=OFF
-
               ninja -j$(nproc)
-              DESTDIR=/tmp/pkg ninja install
-
-              # Clean version (remove v prefix)
-              VERSION_CLEAN=$(echo "$VERSION" | sed "s/^v//")
-
-              mkdir -p /tmp/pkg/DEBIAN
-              cat > /tmp/pkg/DEBIAN/control << EOF
-          Package: azahar-emu-l4t
-          Version: ${VERSION_CLEAN}
-          Architecture: arm64
-          Maintainer: Ethiquema <noreply@ethiquema.github.io>
-          Depends: libc6, libqt6widgets6, libqt6gui6, libqt6core6, libqt6multimedia6, libqt6opengl6, libsdl2-2.0-0, libssl3t64, libavcodec60, libavformat60, libswscale7, libspeexdsp1, libfmt9, libzstd1, libusb-1.0-0, libhidapi-hidraw0, libboost-serialization1.83.0, libenet7, liblz4-1
-          Provides: citra
-          Replaces: citra
-          Section: games
-          Priority: optional
-          Description: Azahar 3DS Emulator (ARM64 L4T build)
-           Azahar is a Nintendo 3DS emulator forked from Citra.
-           This build is optimized for Nintendo Switch L4T with Vulkan support.
-          EOF
-
-              dpkg-deb --build /tmp/pkg /workspace/azahar-emu-l4t_${VERSION_CLEAN}_arm64.deb
+              DESTDIR=/pkg/azahar ninja install
             '
+          docker commit $(docker ps -lq) emu-builder-image
 
-      - name: Build Dolphin from source
-        if: matrix.name == 'dolphin'
+      - name: Build Dolphin
+        continue-on-error: true
         run: |
           docker run --rm --platform linux/arm64 \
             -v ${{ github.workspace }}:/workspace \
-            -e COMMIT=${{ matrix.version }} \
-            -e SHORT_SHA=${{ matrix.short }} \
-            ubuntu:24.04 bash -c '
+            emu-builder-image bash -c '
               set -e
-              export DEBIAN_FRONTEND=noninteractive
-
-              apt-get update
-              apt-get install -y \
-                build-essential cmake ninja-build git pkg-config \
-                libavcodec-dev libavformat-dev libavutil-dev libswscale-dev \
-                libxi-dev libxrandr-dev libevdev-dev libsfml-dev \
-                libminiupnpc-dev libmbedtls-dev libcurl4-openssl-dev \
-                libhidapi-dev libsystemd-dev libbluetooth-dev \
-                libasound2-dev libpulse-dev libpugixml-dev libbz2-dev \
-                libzstd-dev liblzo2-dev libpng-dev libusb-1.0-0-dev libfmt-dev \
-                qt6-base-dev qt6-base-private-dev libqt6svg6-dev \
-                libxxhash-dev libspng-dev libxcb-cursor0 \
-                dpkg-dev fakeroot
-
-              cd /tmp
-              git clone https://github.com/dolphin-emu/dolphin.git
-              cd dolphin
-              git checkout "$COMMIT"
-              git submodule update --init --recursive
-
-              mkdir build && cd build
+              echo "=== Building Dolphin ==="
+              cd /src/dolphin
+              mkdir -p build && cd build
               cmake .. -G Ninja \
                 -DCMAKE_BUILD_TYPE=Release \
                 -DCMAKE_INSTALL_PREFIX=/usr \
-                -DCMAKE_CXX_FLAGS="-mcpu=cortex-a57" \
+                -DCMAKE_C_FLAGS="-O3 -flto -march=armv8-a+crc+simd -mtune=cortex-a57" \
+                -DCMAKE_CXX_FLAGS="-O3 -flto -march=armv8-a+crc+simd -mtune=cortex-a57" \
+                -DCMAKE_EXE_LINKER_FLAGS="-ljemalloc" \
+                -DCMAKE_SHARED_LINKER_FLAGS="-ljemalloc" \
                 -DENABLE_VULKAN=ON \
                 -DENABLE_X11=OFF \
                 -DENABLE_WAYLAND=ON \
                 -DENABLE_TESTS=OFF \
                 -DENABLE_ANALYTICS=OFF
-
               ninja -j$(nproc)
-              DESTDIR=/tmp/pkg ninja install
+              DESTDIR=/pkg/dolphin ninja install
+            '
+          docker commit $(docker ps -lq) emu-builder-image
 
-              # Version must start with digit for dpkg
-              PKG_VERSION="0.0.0+git.${SHORT_SHA}"
-              mkdir -p /tmp/pkg/DEBIAN
-              cat > /tmp/pkg/DEBIAN/control << EOF
-          Package: dolphin-emu-l4t
-          Version: ${PKG_VERSION}
+      - name: Build DuckStation
+        continue-on-error: true
+        run: |
+          docker run --rm --platform linux/arm64 \
+            -v ${{ github.workspace }}:/workspace \
+            emu-builder-image bash -c '
+              set -e
+              echo "=== Building DuckStation ==="
+              cd /src/duckstation
+              mkdir -p build && cd build
+              cmake .. -G Ninja \
+                -DCMAKE_BUILD_TYPE=Release \
+                -DCMAKE_INSTALL_PREFIX=/usr \
+                -DCMAKE_C_FLAGS="-O3 -flto -march=armv8-a+crc+simd -mtune=cortex-a57" \
+                -DCMAKE_CXX_FLAGS="-O3 -flto -march=armv8-a+crc+simd -mtune=cortex-a57" \
+                -DCMAKE_EXE_LINKER_FLAGS="-ljemalloc" \
+                -DCMAKE_SHARED_LINKER_FLAGS="-ljemalloc" \
+                -DBUILD_QT_FRONTEND=ON \
+                -DBUILD_NOGUI_FRONTEND=OFF \
+                -DENABLE_WAYLAND=ON \
+                -DENABLE_X11=OFF
+              ninja -j$(nproc)
+              DESTDIR=/pkg/duckstation ninja install
+            '
+          docker commit $(docker ps -lq) emu-builder-image
+
+      - name: Build EmulationStation-DE
+        continue-on-error: true
+        run: |
+          docker run --rm --platform linux/arm64 \
+            -v ${{ github.workspace }}:/workspace \
+            emu-builder-image bash -c '
+              set -e
+              echo "=== Building EmulationStation-DE ==="
+              cd /src/esde
+              mkdir -p build && cd build
+              cmake .. -G Ninja \
+                -DCMAKE_BUILD_TYPE=Release \
+                -DCMAKE_INSTALL_PREFIX=/usr \
+                -DCMAKE_C_FLAGS="-O3 -flto -march=armv8-a+crc+simd -mtune=cortex-a57" \
+                -DCMAKE_CXX_FLAGS="-O3 -flto -march=armv8-a+crc+simd -mtune=cortex-a57"
+              ninja -j$(nproc)
+              DESTDIR=/pkg/esde ninja install
+            '
+          docker commit $(docker ps -lq) emu-builder-image
+
+      - name: Build melonDS
+        continue-on-error: true
+        run: |
+          docker run --rm --platform linux/arm64 \
+            -v ${{ github.workspace }}:/workspace \
+            emu-builder-image bash -c '
+              set -e
+              echo "=== Building melonDS ==="
+              cd /src/melonds
+              mkdir -p build && cd build
+              cmake .. -G Ninja \
+                -DCMAKE_BUILD_TYPE=Release \
+                -DCMAKE_INSTALL_PREFIX=/usr \
+                -DCMAKE_C_FLAGS="-O3 -flto -march=armv8-a+crc+simd -mtune=cortex-a57" \
+                -DCMAKE_CXX_FLAGS="-O3 -flto -march=armv8-a+crc+simd -mtune=cortex-a57" \
+                -DCMAKE_EXE_LINKER_FLAGS="-ljemalloc" \
+                -DCMAKE_SHARED_LINKER_FLAGS="-ljemalloc" \
+                -DENABLE_WAYLAND=ON
+              ninja -j$(nproc)
+              DESTDIR=/pkg/melonds ninja install
+            '
+          docker commit $(docker ps -lq) emu-builder-image
+
+      - name: Build PPSSPP
+        continue-on-error: true
+        run: |
+          docker run --rm --platform linux/arm64 \
+            -v ${{ github.workspace }}:/workspace \
+            emu-builder-image bash -c '
+              set -e
+              echo "=== Building PPSSPP ==="
+              cd /src/ppsspp
+              mkdir -p build && cd build
+              cmake .. -G Ninja \
+                -DCMAKE_BUILD_TYPE=Release \
+                -DCMAKE_INSTALL_PREFIX=/usr \
+                -DCMAKE_C_FLAGS="-O3 -flto -march=armv8-a+crc+simd -mtune=cortex-a57" \
+                -DCMAKE_CXX_FLAGS="-O3 -flto -march=armv8-a+crc+simd -mtune=cortex-a57" \
+                -DCMAKE_EXE_LINKER_FLAGS="-ljemalloc" \
+                -DCMAKE_SHARED_LINKER_FLAGS="-ljemalloc" \
+                -DUSING_QT_UI=OFF \
+                -DHEADLESS=OFF \
+                -DUSE_WAYLAND_WSI=ON \
+                -DVULKAN=ON
+              ninja -j$(nproc)
+
+              mkdir -p /pkg/ppsspp/usr/bin /pkg/ppsspp/usr/share/applications /pkg/ppsspp/usr/share/ppsspp
+              cp PPSSPPSDL /pkg/ppsspp/usr/bin/ppsspp
+              cp -r ../assets /pkg/ppsspp/usr/share/ppsspp/
+
+              cat > /pkg/ppsspp/usr/share/applications/ppsspp.desktop << DESK
+          [Desktop Entry]
+          Name=PPSSPP
+          Comment=PlayStation Portable Emulator
+          Exec=ppsspp
+          Icon=ppsspp
+          Terminal=false
+          Type=Application
+          Categories=Game;Emulator;
+          DESK
+            '
+          docker commit $(docker ps -lq) emu-builder-image
+
+      - name: Build xemu
+        continue-on-error: true
+        run: |
+          docker run --rm --platform linux/arm64 \
+            -v ${{ github.workspace }}:/workspace \
+            emu-builder-image bash -c '
+              set -e
+              echo "=== Building xemu ==="
+              cd /src/xemu
+              export CFLAGS="-O3 -flto -march=armv8-a+crc+simd -mtune=cortex-a57"
+              export CXXFLAGS="-O3 -flto -march=armv8-a+crc+simd -mtune=cortex-a57"
+              export LDFLAGS="-ljemalloc"
+              ./build.sh
+
+              mkdir -p /pkg/xemu/usr/bin /pkg/xemu/usr/share/applications
+              cp dist/xemu /pkg/xemu/usr/bin/
+
+              cat > /pkg/xemu/usr/share/applications/xemu.desktop << DESK
+          [Desktop Entry]
+          Name=xemu
+          Comment=Original Xbox Emulator
+          Exec=xemu
+          Icon=xemu
+          Terminal=false
+          Type=Application
+          Categories=Game;Emulator;
+          DESK
+            '
+          docker commit $(docker ps -lq) emu-builder-image
+
+      # =========================================================================
+      # PACKAGE ALL DEBS
+      # =========================================================================
+
+      - name: Package all .deb files
+        run: |
+          docker run --rm --platform linux/arm64 \
+            -v ${{ github.workspace }}:/workspace \
+            -e AZAHAR_VERSION=${{ steps.versions.outputs.azahar_version }} \
+            -e DOLPHIN_SHORT=${{ steps.versions.outputs.dolphin_short }} \
+            -e DUCK_SHORT=${{ steps.versions.outputs.duck_short }} \
+            -e ESDE_VERSION=${{ steps.versions.outputs.esde_version }} \
+            -e MELONDS_VERSION=${{ steps.versions.outputs.melonds_version }} \
+            -e PPSSPP_VERSION=${{ steps.versions.outputs.ppsspp_version }} \
+            -e XEMU_VERSION=${{ steps.versions.outputs.xemu_version }} \
+            emu-builder-image bash -c '
+              echo "=== Packaging .deb files for successful builds ==="
+
+              # Azahar
+              if [ -d /pkg/azahar/usr ]; then
+                AZAHAR_CLEAN=$(echo "$AZAHAR_VERSION" | sed "s/^v//")
+                mkdir -p /pkg/azahar/DEBIAN
+                cat > /pkg/azahar/DEBIAN/control << EOF
+          Package: azahar-emu-l4t
+          Version: ${AZAHAR_CLEAN}
           Architecture: arm64
           Maintainer: Ethiquema <noreply@ethiquema.github.io>
-          Depends: libc6, libqt6widgets6, libqt6gui6, libqt6core6, libavcodec60, libavformat60, libswscale7, libevdev2, libminiupnpc17, libmbedtls21, libcurl4t64, libhidapi-hidraw0, libsystemd0, libbluetooth3, libasound2t64, libpulse0, libpugixml1v5, libbz2-1.0, libzstd1, liblzo2-2, libpng16-16t64, libusb-1.0-0, libfmt9, libsfml-system2.6, libsfml-network2.6, libxxhash0, libspng0
+          Depends: libc6, libjemalloc2, libqt6widgets6, libqt6gui6, libqt6core6, libqt6multimedia6, libqt6opengl6, libsdl2-2.0-0, libssl3t64, libavcodec60, libavformat60, libswscale7, libspeexdsp1, libfmt9, libzstd1, libusb-1.0-0, libhidapi-hidraw0, libboost-serialization1.83.0, libenet7, liblz4-1
+          Provides: citra
+          Replaces: citra
+          Section: games
+          Priority: optional
+          Description: Azahar 3DS Emulator (ARM64 L4T build)
+           Optimized for Nintendo Switch with Vulkan support.
+          EOF
+                dpkg-deb --build /pkg/azahar /workspace/azahar-emu-l4t_${AZAHAR_CLEAN}_arm64.deb
+                echo "✓ Azahar packaged"
+              else
+                echo "✗ Azahar build not found, skipping"
+              fi
+
+              # Dolphin
+              if [ -d /pkg/dolphin/usr ]; then
+                DOLPHIN_PKG="0.0.0+git.${DOLPHIN_SHORT}"
+                mkdir -p /pkg/dolphin/DEBIAN
+                cat > /pkg/dolphin/DEBIAN/control << EOF
+          Package: dolphin-emu-l4t
+          Version: ${DOLPHIN_PKG}
+          Architecture: arm64
+          Maintainer: Ethiquema <noreply@ethiquema.github.io>
+          Depends: libc6, libjemalloc2, libqt6widgets6, libqt6gui6, libqt6core6, libavcodec60, libavformat60, libswscale7, libevdev2, libminiupnpc17, libmbedtls21, libcurl4t64, libhidapi-hidraw0, libsystemd0, libbluetooth3, libasound2t64, libpulse0, libpugixml1v5, libbz2-1.0, libzstd1, liblzo2-2, libpng16-16t64, libusb-1.0-0, libfmt9, libsfml-system2.6, libsfml-network2.6, libxxhash0, libspng0
           Section: games
           Priority: optional
           Description: Dolphin GameCube/Wii Emulator (ARM64 L4T build)
-           Dolphin is an emulator for GameCube and Wii games.
-           This build is optimized for Nintendo Switch L4T with Vulkan/Wayland support.
+           Optimized for Nintendo Switch with Vulkan/Wayland support.
           EOF
+                dpkg-deb --build /pkg/dolphin /workspace/dolphin-emu-l4t_${DOLPHIN_PKG}_arm64.deb
+                echo "✓ Dolphin packaged"
+              else
+                echo "✗ Dolphin build not found, skipping"
+              fi
 
-              dpkg-deb --build /tmp/pkg /workspace/dolphin-emu-l4t_${PKG_VERSION}_arm64.deb
+              # DuckStation
+              if [ -d /pkg/duckstation/usr ]; then
+                DUCK_PKG="0.0.0+git.${DUCK_SHORT}"
+                mkdir -p /pkg/duckstation/DEBIAN
+                cat > /pkg/duckstation/DEBIAN/control << EOF
+          Package: duckstation-l4t
+          Version: ${DUCK_PKG}
+          Architecture: arm64
+          Maintainer: Ethiquema <noreply@ethiquema.github.io>
+          Depends: libc6, libjemalloc2, libqt6widgets6, libqt6gui6, libqt6core6, libsdl2-2.0-0, libcurl4t64
+          Section: games
+          Priority: optional
+          Description: DuckStation PS1 Emulator (ARM64 L4T build)
+           Optimized for Nintendo Switch with Vulkan support.
+          EOF
+                dpkg-deb --build /pkg/duckstation /workspace/duckstation-l4t_${DUCK_PKG}_arm64.deb
+                echo "✓ DuckStation packaged"
+              else
+                echo "✗ DuckStation build not found, skipping"
+              fi
+
+              # EmulationStation-DE
+              if [ -d /pkg/esde/usr ]; then
+                ESDE_CLEAN=$(echo "$ESDE_VERSION" | sed "s/^v//")
+                mkdir -p /pkg/esde/DEBIAN
+                cat > /pkg/esde/DEBIAN/control << EOF
+          Package: emulationstation-de-l4t
+          Version: ${ESDE_CLEAN}
+          Architecture: arm64
+          Maintainer: Ethiquema <noreply@ethiquema.github.io>
+          Depends: libc6, libsdl2-2.0-0, libavcodec60, libavformat60, libswscale7, libfreeimage3t64, libfreetype6, libcurl4t64, libpugixml1v5, libvlc5, libpoppler-cpp0t64
+          Provides: emulationstation
+          Conflicts: emulationstation
+          Section: games
+          Priority: optional
+          Description: EmulationStation Desktop Edition (ARM64 L4T build)
+           Optimized for Nintendo Switch.
+          EOF
+                dpkg-deb --build /pkg/esde /workspace/emulationstation-de-l4t_${ESDE_CLEAN}_arm64.deb
+                echo "✓ EmulationStation-DE packaged"
+              else
+                echo "✗ EmulationStation-DE build not found, skipping"
+              fi
+
+              # melonDS
+              if [ -d /pkg/melonds/usr ]; then
+                MELONDS_CLEAN=$(echo "$MELONDS_VERSION" | sed "s/^v//")
+                mkdir -p /pkg/melonds/DEBIAN
+                cat > /pkg/melonds/DEBIAN/control << EOF
+          Package: melonds-l4t
+          Version: ${MELONDS_CLEAN}
+          Architecture: arm64
+          Maintainer: Ethiquema <noreply@ethiquema.github.io>
+          Depends: libc6, libjemalloc2, libqt6widgets6, libqt6gui6, libqt6core6, libqt6multimedia6, libsdl2-2.0-0, libslirp0, libarchive13t64, libzstd1
+          Section: games
+          Priority: optional
+          Description: melonDS Nintendo DS Emulator (ARM64 L4T build)
+           Optimized for Nintendo Switch with OpenGL renderer.
+          EOF
+                dpkg-deb --build /pkg/melonds /workspace/melonds-l4t_${MELONDS_CLEAN}_arm64.deb
+                echo "✓ melonDS packaged"
+              else
+                echo "✗ melonDS build not found, skipping"
+              fi
+
+              # PPSSPP
+              if [ -d /pkg/ppsspp/usr ]; then
+                PPSSPP_CLEAN=$(echo "$PPSSPP_VERSION" | sed "s/^v//")
+                mkdir -p /pkg/ppsspp/DEBIAN
+                cat > /pkg/ppsspp/DEBIAN/control << EOF
+          Package: ppsspp-l4t
+          Version: ${PPSSPP_CLEAN}
+          Architecture: arm64
+          Maintainer: Ethiquema <noreply@ethiquema.github.io>
+          Depends: libc6, libjemalloc2, libsdl2-2.0-0, libsdl2-ttf-2.0-0, libglew2.2, libsnappy1v5, libavcodec60, libavformat60, libswscale7, libzip4t64, libpng16-16t64
+          Provides: ppsspp
+          Conflicts: ppsspp
+          Section: games
+          Priority: optional
+          Description: PPSSPP PlayStation Portable Emulator (ARM64 L4T build)
+           Optimized for Nintendo Switch with Vulkan support.
+          EOF
+                dpkg-deb --build /pkg/ppsspp /workspace/ppsspp-l4t_${PPSSPP_CLEAN}_arm64.deb
+                echo "✓ PPSSPP packaged"
+              else
+                echo "✗ PPSSPP build not found, skipping"
+              fi
+
+              # xemu
+              if [ -d /pkg/xemu/usr ]; then
+                XEMU_CLEAN=$(echo "$XEMU_VERSION" | sed "s/^v//")
+                mkdir -p /pkg/xemu/DEBIAN
+                cat > /pkg/xemu/DEBIAN/control << EOF
+          Package: xemu-l4t
+          Version: ${XEMU_CLEAN}
+          Architecture: arm64
+          Maintainer: Ethiquema <noreply@ethiquema.github.io>
+          Depends: libc6, libjemalloc2, libsdl2-2.0-0, libepoxy0, libpixman-1-0, libgtk-3-0t64, libssl3t64, libsamplerate0, libpcap0.8t64, libslirp0
+          Section: games
+          Priority: optional
+          Description: xemu Original Xbox Emulator (ARM64 L4T build)
+           Optimized for Nintendo Switch with Vulkan support.
+          EOF
+                dpkg-deb --build /pkg/xemu /workspace/xemu-l4t_${XEMU_CLEAN}_arm64.deb
+                echo "✓ xemu packaged"
+              else
+                echo "✗ xemu build not found, skipping"
+              fi
+
+              echo "=== Packaging complete ==="
+              ls -la /workspace/*.deb 2>/dev/null || echo "No packages were built"
             '
 
-      - name: Upload artifact
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: deb-${{ matrix.name }}
+          name: emulator-debs
           path: "*.deb"
           retention-days: 1
 
-      - name: Save version tracker
+      - name: Save version trackers
         run: |
-          case "${{ matrix.name }}" in
-            azahar) echo "${{ matrix.version }}" > .azahar-version ;;
-            dolphin) echo "${{ matrix.version }}" > .dolphin-commit ;;
-            duckstation) echo "${{ matrix.version }}" > .duckstation-version ;;
-            esde) echo "${{ matrix.version }}" > .esde-version ;;
-            melonds) echo "${{ matrix.version }}" > .melonds-version ;;
-            ppsspp) echo "${{ matrix.version }}" > .ppsspp-version ;;
-            xemu) echo "${{ matrix.version }}" > .xemu-version ;;
-          esac
-
-      - name: Upload version tracker
-        uses: actions/upload-artifact@v4
-        with:
-          name: tracker-${{ matrix.name }}
-          path: ".*-version|.*-commit"
-          retention-days: 1
+          echo "${{ steps.versions.outputs.azahar_version }}" > .azahar-version
+          echo "${{ steps.versions.outputs.dolphin_commit }}" > .dolphin-commit
+          echo "${{ steps.versions.outputs.duck_commit }}" > .duckstation-commit
+          echo "${{ steps.versions.outputs.esde_version }}" > .esde-version
+          echo "${{ steps.versions.outputs.melonds_version }}" > .melonds-version
+          echo "${{ steps.versions.outputs.ppsspp_version }}" > .ppsspp-version
+          echo "${{ steps.versions.outputs.xemu_version }}" > .xemu-version
 
   update-repo:
     needs: build
@@ -399,17 +540,10 @@ jobs:
         with:
           ref: main
 
-      - name: Download all artifacts
+      - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
-          pattern: deb-*
-          merge-multiple: true
-
-      - name: Download version trackers
-        uses: actions/download-artifact@v4
-        with:
-          pattern: tracker-*
-          merge-multiple: true
+          name: emulator-debs
 
       - name: Checkout gh-pages
         run: |
