@@ -216,6 +216,7 @@ jobs:
           EOF
 
           apt-ftparchive release . >> Release
+          rm -f Release.gpg InRelease
           gpg --batch --default-key "Ethiquema L4T Repo" -abs -o Release.gpg Release
           gpg --batch --default-key "Ethiquema L4T Repo" --clearsign -o InRelease Release
 
