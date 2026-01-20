@@ -302,6 +302,22 @@ Multi-Arch: foreign
 Description: CUDA licenses
  Contains the license agreements (EULA) required for using the CUDA tools.
 
+Package: duckstation-l4t
+Version: 1.0
+Architecture: arm64
+Maintainer: Ethiquema <noreply@ethiquema.github.io>
+Depends: libfuse2t64 | libfuse2
+Filename: pool/main/duckstation-l4t_1.0_arm64.deb
+Size: 81213730
+MD5sum: 1bf004e071737d8f4211510754c658cd
+SHA1: 6017c35b8235a184723f0094e4da0b221482b22f
+SHA256: 4a5efa1accfe159d493e2f409c3a76f77c790d8cd7f3b48e3cd09f8674b888c7
+Section: games
+Priority: optional
+Description: DuckStation PlayStation 1 Emulator (ARM64 AppImage)
+ Fast PlayStation 1 emulator with high compatibility.
+ Optimized for Nintendo Switch L4T.
+
 Package: ffmpeg
 Version: 9:6.1.1-3ubuntu5l4t2
 Architecture: arm64
