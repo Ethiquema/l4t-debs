@@ -1,0 +1,161 @@
+name: Build xemu ARM64 .deb
+
+on:
+  schedule:
+    - cron: '0 4 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-xemu:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout this repo
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Check for new xemu release
+        id: check
+        run: |
+          RELEASE_INFO=$(curl -fsSL https://api.github.com/repos/xemu-project/xemu/releases/latest)
+          LATEST_TAG=$(echo "$RELEASE_INFO" | jq -r '.tag_name')
+          echo "Latest xemu release: $LATEST_TAG"
+
+          STORED_VERSION=""
+          if [ -f .xemu-version ]; then
+            STORED_VERSION=$(cat .xemu-version)
+          fi
+
+          if [ "$LATEST_TAG" != "$STORED_VERSION" ]; then
+            echo "should_build=true" >> $GITHUB_OUTPUT
+            echo "version=$LATEST_TAG" >> $GITHUB_OUTPUT
+
+            # Get ARM64 AppImage URL (non-debug version)
+            APPIMAGE_URL=$(echo "$RELEASE_INFO" | jq -r '.assets[] | select(.name | test("aarch64.AppImage$")) | select(.name | test("dbg") | not) | .browser_download_url')
+            echo "appimage_url=$APPIMAGE_URL" >> $GITHUB_OUTPUT
+            echo "AppImage URL: $APPIMAGE_URL"
+          else
+            echo "should_build=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Download and repackage as .deb
+        if: steps.check.outputs.should_build == 'true'
+        run: |
+          set -e
+          VERSION="${{ steps.check.outputs.version }}"
+          VERSION_CLEAN=$(echo "$VERSION" | sed 's/^v//')
+
+          # Download AppImage
+          curl -fsSL -o xemu.AppImage "${{ steps.check.outputs.appimage_url }}"
+          chmod +x xemu.AppImage
+
+          # Create .deb structure
+          mkdir -p xemu-pkg/DEBIAN
+          mkdir -p xemu-pkg/usr/bin
+          mkdir -p xemu-pkg/usr/share/applications
+
+          cp xemu.AppImage xemu-pkg/usr/bin/xemu.AppImage
+
+          cat > xemu-pkg/usr/bin/xemu << 'WRAPPER'
+          #!/bin/bash
+          exec /usr/bin/xemu.AppImage "$@"
+          WRAPPER
+          chmod +x xemu-pkg/usr/bin/xemu
+
+          cat > xemu-pkg/usr/share/applications/xemu.desktop << 'DESKTOP'
+          [Desktop Entry]
+          Name=xemu
+          Comment=Original Xbox Emulator
+          Exec=xemu
+          Icon=xemu
+          Terminal=false
+          Type=Application
+          Categories=Game;Emulator;
+          DESKTOP
+
+          cat > xemu-pkg/DEBIAN/control << EOF
+          Package: xemu-l4t
+          Version: ${VERSION_CLEAN}
+          Architecture: arm64
+          Maintainer: Ethiquema <noreply@ethiquema.github.io>
+          Depends: libfuse2t64 | libfuse2
+          Section: games
+          Priority: optional
+          Description: xemu Original Xbox Emulator (ARM64 AppImage)
+           Low-level Xbox emulator with high compatibility.
+           Optimized for Nintendo Switch L4T.
+          EOF
+
+          dpkg-deb --build xemu-pkg xemu-l4t_${VERSION_CLEAN}_arm64.deb
+
+      - name: Save version tracker
+        if: steps.check.outputs.should_build == 'true'
+        run: echo "${{ steps.check.outputs.version }}" > .xemu-version
+
+      - name: Checkout gh-pages
+        if: steps.check.outputs.should_build == 'true'
+        run: |
+          git fetch origin gh-pages:gh-pages || true
+          git worktree add gh-pages-dir gh-pages || {
+            git worktree add --detach gh-pages-dir
+            cd gh-pages-dir
+            git checkout --orphan gh-pages
+            git rm -rf . 2>/dev/null || true
+            mkdir -p pool/main dists/noble/main/binary-arm64
+            cd ..
+          }
+
+      - name: Install APT tools
+        if: steps.check.outputs.should_build == 'true'
+        run: sudo apt-get update && sudo apt-get install -y dpkg-dev apt-utils
+
+      - name: Import GPG key and add package
+        if: steps.check.outputs.should_build == 'true'
+        run: |
+          echo "${{ secrets.PRIVATE }}" | gpg --batch --import
+          gpg --armor --export "Ethiquema L4T Repo" > gh-pages-dir/public.key
+          mkdir -p gh-pages-dir/pool/main
+          cp xemu-l4t_*_arm64.deb gh-pages-dir/pool/main/
+
+      - name: Regenerate APT repository metadata
+        if: steps.check.outputs.should_build == 'true'
+        run: |
+          cd gh-pages-dir
+          mkdir -p dists/noble/main/binary-arm64
+          dpkg-scanpackages --arch arm64 pool/ > dists/noble/main/binary-arm64/Packages
+          gzip -k -f dists/noble/main/binary-arm64/Packages
+          cd dists/noble
+          cat > Release << EOF
+          Origin: Ethiquema L4T Repository
+          Label: l4t-debs
+          Suite: noble
+          Codename: noble
+          Architectures: arm64
+          Components: main
+          Description: L4T packages for Nintendo Switch
+          EOF
+          apt-ftparchive release . >> Release
+          gpg --default-key "Ethiquema L4T Repo" -abs -o Release.gpg Release
+          gpg --default-key "Ethiquema L4T Repo" --clearsign -o InRelease Release
+
+      - name: Deploy to gh-pages
+        if: steps.check.outputs.should_build == 'true'
+        run: |
+          cd gh-pages-dir
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Add xemu ${{ steps.check.outputs.version }} ARM64" || echo "No changes"
+          git push origin gh-pages
+
+      - name: Save tracker to main
+        if: steps.check.outputs.should_build == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .xemu-version
+          git commit -m "Update xemu version tracker" || echo "No changes"
+          git push origin main

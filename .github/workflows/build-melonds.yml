@@ -1,0 +1,162 @@
+name: Build melonDS ARM64 .deb
+
+on:
+  schedule:
+    - cron: '0 4 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-melonds:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout this repo
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Check for new melonDS release
+        id: check
+        run: |
+          RELEASE_INFO=$(curl -fsSL https://api.github.com/repos/melonDS-emu/melonDS/releases/latest)
+          LATEST_TAG=$(echo "$RELEASE_INFO" | jq -r '.tag_name')
+          echo "Latest melonDS release: $LATEST_TAG"
+
+          STORED_VERSION=""
+          if [ -f .melonds-version ]; then
+            STORED_VERSION=$(cat .melonds-version)
+          fi
+
+          if [ "$LATEST_TAG" != "$STORED_VERSION" ]; then
+            echo "should_build=true" >> $GITHUB_OUTPUT
+            echo "version=$LATEST_TAG" >> $GITHUB_OUTPUT
+
+            # Get ARM64 AppImage URL
+            APPIMAGE_URL=$(echo "$RELEASE_INFO" | jq -r '.assets[] | select(.name | test("appimage-aarch64.zip$")) | .browser_download_url')
+            echo "appimage_url=$APPIMAGE_URL" >> $GITHUB_OUTPUT
+            echo "AppImage URL: $APPIMAGE_URL"
+          else
+            echo "should_build=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Download and repackage as .deb
+        if: steps.check.outputs.should_build == 'true'
+        run: |
+          set -e
+          VERSION="${{ steps.check.outputs.version }}"
+
+          # Download and extract AppImage
+          curl -fsSL -o melonds.zip "${{ steps.check.outputs.appimage_url }}"
+          unzip melonds.zip
+          APPIMAGE=$(find . -name "*.AppImage" | head -1)
+          chmod +x "$APPIMAGE"
+
+          # Create .deb structure
+          mkdir -p melonds-pkg/DEBIAN
+          mkdir -p melonds-pkg/usr/bin
+          mkdir -p melonds-pkg/usr/share/applications
+
+          cp "$APPIMAGE" melonds-pkg/usr/bin/melonDS.AppImage
+
+          cat > melonds-pkg/usr/bin/melonDS << 'WRAPPER'
+          #!/bin/bash
+          exec /usr/bin/melonDS.AppImage "$@"
+          WRAPPER
+          chmod +x melonds-pkg/usr/bin/melonDS
+
+          cat > melonds-pkg/usr/share/applications/melonDS.desktop << 'DESKTOP'
+          [Desktop Entry]
+          Name=melonDS
+          Comment=Nintendo DS/DSi Emulator
+          Exec=melonDS
+          Icon=melonDS
+          Terminal=false
+          Type=Application
+          Categories=Game;Emulator;
+          DESKTOP
+
+          cat > melonds-pkg/DEBIAN/control << EOF
+          Package: melonds-l4t
+          Version: ${VERSION}
+          Architecture: arm64
+          Maintainer: Ethiquema <noreply@ethiquema.github.io>
+          Depends: libfuse2t64 | libfuse2
+          Section: games
+          Priority: optional
+          Description: melonDS Nintendo DS/DSi Emulator (ARM64 AppImage)
+           Accurate Nintendo DS and DSi emulator.
+           Optimized for Nintendo Switch L4T.
+          EOF
+
+          dpkg-deb --build melonds-pkg melonds-l4t_${VERSION}_arm64.deb
+
+      - name: Save version tracker
+        if: steps.check.outputs.should_build == 'true'
+        run: echo "${{ steps.check.outputs.version }}" > .melonds-version
+
+      - name: Checkout gh-pages
+        if: steps.check.outputs.should_build == 'true'
+        run: |
+          git fetch origin gh-pages:gh-pages || true
+          git worktree add gh-pages-dir gh-pages || {
+            git worktree add --detach gh-pages-dir
+            cd gh-pages-dir
+            git checkout --orphan gh-pages
+            git rm -rf . 2>/dev/null || true
+            mkdir -p pool/main dists/noble/main/binary-arm64
+            cd ..
+          }
+
+      - name: Install APT tools
+        if: steps.check.outputs.should_build == 'true'
+        run: sudo apt-get update && sudo apt-get install -y dpkg-dev apt-utils
+
+      - name: Import GPG key and add package
+        if: steps.check.outputs.should_build == 'true'
+        run: |
+          echo "${{ secrets.PRIVATE }}" | gpg --batch --import
+          gpg --armor --export "Ethiquema L4T Repo" > gh-pages-dir/public.key
+          mkdir -p gh-pages-dir/pool/main
+          cp melonds-l4t_*_arm64.deb gh-pages-dir/pool/main/
+
+      - name: Regenerate APT repository metadata
+        if: steps.check.outputs.should_build == 'true'
+        run: |
+          cd gh-pages-dir
+          mkdir -p dists/noble/main/binary-arm64
+          dpkg-scanpackages --arch arm64 pool/ > dists/noble/main/binary-arm64/Packages
+          gzip -k -f dists/noble/main/binary-arm64/Packages
+          cd dists/noble
+          cat > Release << EOF
+          Origin: Ethiquema L4T Repository
+          Label: l4t-debs
+          Suite: noble
+          Codename: noble
+          Architectures: arm64
+          Components: main
+          Description: L4T packages for Nintendo Switch
+          EOF
+          apt-ftparchive release . >> Release
+          gpg --default-key "Ethiquema L4T Repo" -abs -o Release.gpg Release
+          gpg --default-key "Ethiquema L4T Repo" --clearsign -o InRelease Release
+
+      - name: Deploy to gh-pages
+        if: steps.check.outputs.should_build == 'true'
+        run: |
+          cd gh-pages-dir
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Add melonDS ${{ steps.check.outputs.version }} ARM64" || echo "No changes"
+          git push origin gh-pages
+
+      - name: Save tracker to main
+        if: steps.check.outputs.should_build == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .melonds-version
+          git commit -m "Update melonDS version tracker" || echo "No changes"
+          git push origin main

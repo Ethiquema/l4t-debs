@@ -1,0 +1,170 @@
+name: Build DuckStation ARM64 .deb
+
+on:
+  schedule:
+    - cron: '0 4 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-duckstation:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout this repo
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Check for new DuckStation release
+        id: check
+        run: |
+          # Get latest release info
+          RELEASE_INFO=$(curl -fsSL https://api.github.com/repos/stenzek/duckstation/releases/latest)
+          LATEST_TAG=$(echo "$RELEASE_INFO" | jq -r '.tag_name')
+          PUBLISHED=$(echo "$RELEASE_INFO" | jq -r '.published_at')
+          echo "Latest DuckStation release: $LATEST_TAG ($PUBLISHED)"
+
+          STORED_VERSION=""
+          if [ -f .duckstation-version ]; then
+            STORED_VERSION=$(cat .duckstation-version)
+          fi
+
+          if [ "$PUBLISHED" != "$STORED_VERSION" ]; then
+            echo "should_build=true" >> $GITHUB_OUTPUT
+            echo "published=$PUBLISHED" >> $GITHUB_OUTPUT
+
+            # Get ARM64 AppImage URL
+            APPIMAGE_URL=$(echo "$RELEASE_INFO" | jq -r '.assets[] | select(.name | test("arm64.AppImage$")) | select(.name | test("Mini") | not) | .browser_download_url')
+            echo "appimage_url=$APPIMAGE_URL" >> $GITHUB_OUTPUT
+            echo "AppImage URL: $APPIMAGE_URL"
+          else
+            echo "should_build=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Download and repackage as .deb
+        if: steps.check.outputs.should_build == 'true'
+        run: |
+          set -e
+
+          # Download AppImage
+          curl -fsSL -o duckstation.AppImage "${{ steps.check.outputs.appimage_url }}"
+          chmod +x duckstation.AppImage
+
+          # Extract version from AppImage
+          VERSION=$(./duckstation.AppImage --version 2>/dev/null | head -1 | grep -oP '\d+\.\d+' || echo "1.0")
+          echo "Version: $VERSION"
+
+          # Create .deb structure
+          mkdir -p duckstation-pkg/DEBIAN
+          mkdir -p duckstation-pkg/usr/bin
+          mkdir -p duckstation-pkg/usr/share/applications
+          mkdir -p duckstation-pkg/usr/share/icons/hicolor/256x256/apps
+
+          # Install AppImage
+          cp duckstation.AppImage duckstation-pkg/usr/bin/duckstation-qt.AppImage
+
+          # Create wrapper script
+          cat > duckstation-pkg/usr/bin/duckstation << 'WRAPPER'
+          #!/bin/bash
+          exec /usr/bin/duckstation-qt.AppImage "$@"
+          WRAPPER
+          chmod +x duckstation-pkg/usr/bin/duckstation
+
+          # Desktop entry
+          cat > duckstation-pkg/usr/share/applications/duckstation.desktop << 'DESKTOP'
+          [Desktop Entry]
+          Name=DuckStation
+          Comment=PlayStation 1 Emulator
+          Exec=duckstation
+          Icon=duckstation
+          Terminal=false
+          Type=Application
+          Categories=Game;Emulator;
+          DESKTOP
+
+          # Control file
+          cat > duckstation-pkg/DEBIAN/control << EOF
+          Package: duckstation-l4t
+          Version: ${VERSION}
+          Architecture: arm64
+          Maintainer: Ethiquema <noreply@ethiquema.github.io>
+          Depends: libfuse2t64 | libfuse2
+          Section: games
+          Priority: optional
+          Description: DuckStation PlayStation 1 Emulator (ARM64 AppImage)
+           Fast PlayStation 1 emulator with high compatibility.
+           Optimized for Nintendo Switch L4T.
+          EOF
+
+          dpkg-deb --build duckstation-pkg duckstation-l4t_${VERSION}_arm64.deb
+
+      - name: Save version tracker
+        if: steps.check.outputs.should_build == 'true'
+        run: echo "${{ steps.check.outputs.published }}" > .duckstation-version
+
+      - name: Checkout gh-pages
+        if: steps.check.outputs.should_build == 'true'
+        run: |
+          git fetch origin gh-pages:gh-pages || true
+          git worktree add gh-pages-dir gh-pages || {
+            git worktree add --detach gh-pages-dir
+            cd gh-pages-dir
+            git checkout --orphan gh-pages
+            git rm -rf . 2>/dev/null || true
+            mkdir -p pool/main dists/noble/main/binary-arm64
+            cd ..
+          }
+
+      - name: Install APT tools
+        if: steps.check.outputs.should_build == 'true'
+        run: sudo apt-get update && sudo apt-get install -y dpkg-dev apt-utils
+
+      - name: Import GPG key and add package
+        if: steps.check.outputs.should_build == 'true'
+        run: |
+          echo "${{ secrets.PRIVATE }}" | gpg --batch --import
+          gpg --armor --export "Ethiquema L4T Repo" > gh-pages-dir/public.key
+          mkdir -p gh-pages-dir/pool/main
+          cp duckstation-l4t_*_arm64.deb gh-pages-dir/pool/main/
+
+      - name: Regenerate APT repository metadata
+        if: steps.check.outputs.should_build == 'true'
+        run: |
+          cd gh-pages-dir
+          mkdir -p dists/noble/main/binary-arm64
+          dpkg-scanpackages --arch arm64 pool/ > dists/noble/main/binary-arm64/Packages
+          gzip -k -f dists/noble/main/binary-arm64/Packages
+          cd dists/noble
+          cat > Release << EOF
+          Origin: Ethiquema L4T Repository
+          Label: l4t-debs
+          Suite: noble
+          Codename: noble
+          Architectures: arm64
+          Components: main
+          Description: L4T packages for Nintendo Switch
+          EOF
+          apt-ftparchive release . >> Release
+          gpg --default-key "Ethiquema L4T Repo" -abs -o Release.gpg Release
+          gpg --default-key "Ethiquema L4T Repo" --clearsign -o InRelease Release
+
+      - name: Deploy to gh-pages
+        if: steps.check.outputs.should_build == 'true'
+        run: |
+          cd gh-pages-dir
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Add DuckStation ARM64" || echo "No changes"
+          git push origin gh-pages
+
+      - name: Save tracker to main
+        if: steps.check.outputs.should_build == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .duckstation-version
+          git commit -m "Update DuckStation version tracker" || echo "No changes"
+          git push origin main
