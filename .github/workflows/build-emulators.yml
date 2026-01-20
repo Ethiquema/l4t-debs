@@ -531,6 +531,19 @@ jobs:
               export CCACHE_MAXSIZE=5G
               ccache -z
 
+              # Build zstd 1.5.7+ (DuckStation requires >= 1.5.7, Ubuntu has older)
+              if [[ ! -f /usr/local/lib/libzstd.so ]]; then
+                echo "Building zstd..."
+                git clone --depth 1 --branch v1.5.7 https://github.com/facebook/zstd.git /tmp/zstd
+                cd /tmp/zstd/build/cmake
+                cmake . -G Ninja \
+                  -DCMAKE_BUILD_TYPE=Release \
+                  -DCMAKE_INSTALL_PREFIX=/usr/local
+                ninja -j$(nproc)
+                ninja install
+                ldconfig
+              fi
+
               # Build SDL3 if not present
               if [[ ! -d /usr/local/lib/cmake/SDL3 ]]; then
                 echo "Building SDL3..."
@@ -586,9 +599,10 @@ jobs:
 
               DESTDIR=/tmp/pkg ninja install
 
-              # Bundle SDL3 with the package
+              # Bundle SDL3 and zstd with the package
               mkdir -p /tmp/pkg/usr/lib/duckstation
               cp /usr/local/lib/libSDL3.so* /tmp/pkg/usr/lib/duckstation/
+              cp /usr/local/lib/libzstd.so* /tmp/pkg/usr/lib/duckstation/
 
               PKG_VERSION="0.0.0+git.${SHORT}"
               mkdir -p /tmp/pkg/DEBIAN
