@@ -128,8 +128,11 @@ jobs:
           set -e
           NAME="${{ matrix.name }}"
           VERSION="${{ matrix.version }}"
-          VERSION_CLEAN=$(echo "$VERSION" | sed 's/^v//')
           URL="${{ matrix.url }}"
+
+          # Clean version for dpkg
+          # Remove 'v' prefix, convert ISO dates to YYYYMMDD format
+          VERSION_CLEAN=$(echo "$VERSION" | sed 's/^v//' | sed 's/^\([0-9]\{4\}\)-\([0-9]\{2\}\)-\([0-9]\{2\}\)T.*/\1\2\3/')
 
           # Download
           if [ "${{ matrix.type }}" = "appimage-zip" ]; then
@@ -143,6 +146,8 @@ jobs:
           chmod +x "$APPIMAGE"
 
           # Package config per emulator
+          PROVIDES=""
+          CONFLICTS=""
           case "$NAME" in
             duckstation)
               PKG_NAME="duckstation-l4t"
@@ -159,8 +164,8 @@ jobs:
               DESKTOP_NAME="EmulationStation Desktop Edition"
               DESKTOP_COMMENT="Emulator Frontend"
               DESCRIPTION="EmulationStation Desktop Edition (ARM64 AppImage)"
-              PROVIDES="Provides: emulationstation"
-              CONFLICTS="Conflicts: emulationstation"
+              PROVIDES="emulationstation"
+              CONFLICTS="emulationstation"
               ;;
             melonds)
               PKG_NAME="melonds-l4t"
@@ -177,8 +182,8 @@ jobs:
               DESKTOP_NAME="PPSSPP"
               DESKTOP_COMMENT="PlayStation Portable Emulator"
               DESCRIPTION="PPSSPP PlayStation Portable Emulator (ARM64 AppImage)"
-              PROVIDES="Provides: ppsspp"
-              CONFLICTS="Conflicts: ppsspp"
+              PROVIDES="ppsspp"
+              CONFLICTS="ppsspp"
               ;;
             xemu)
               PKG_NAME="xemu-l4t"
@@ -212,19 +217,20 @@ jobs:
           Categories=Game;Emulator;
           DESKTOP
 
-          cat > pkg/DEBIAN/control << EOF
-          Package: $PKG_NAME
-          Version: $VERSION_CLEAN
-          Architecture: arm64
-          Maintainer: Ethiquema <noreply@ethiquema.github.io>
-          Depends: libfuse2t64 | libfuse2
-          ${PROVIDES:-}
-          ${CONFLICTS:-}
-          Section: games
-          Priority: optional
-          Description: $DESCRIPTION
-           Optimized for Nintendo Switch L4T.
-          EOF
+          # Build control file (only add Provides/Conflicts if set)
+          {
+            echo "Package: $PKG_NAME"
+            echo "Version: $VERSION_CLEAN"
+            echo "Architecture: arm64"
+            echo "Maintainer: Ethiquema <noreply@ethiquema.github.io>"
+            echo "Depends: libfuse2t64 | libfuse2"
+            [ -n "$PROVIDES" ] && echo "Provides: $PROVIDES"
+            [ -n "$CONFLICTS" ] && echo "Conflicts: $CONFLICTS"
+            echo "Section: games"
+            echo "Priority: optional"
+            echo "Description: $DESCRIPTION"
+            echo " Optimized for Nintendo Switch L4T."
+          } > pkg/DEBIAN/control
 
           dpkg-deb --build pkg "${PKG_NAME}_${VERSION_CLEAN}_arm64.deb"
 
