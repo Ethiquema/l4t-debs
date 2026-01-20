@@ -12,7 +12,7 @@ permissions:
   contents: write
 
 env:
-  CACHE_KEY: emu-deps-v1
+  CACHE_KEY: emu-deps-v2
 
 jobs:
   # ===========================================================================
@@ -162,7 +162,7 @@ jobs:
                 qt6-base-dev qt6-base-private-dev qt6-multimedia-dev qt6-tools-dev \
                 libqt6opengl6-dev libqt6svg6-dev \
                 libsdl2-dev libsdl2-ttf-dev \
-                libavcodec-dev libavformat-dev libavutil-dev libswscale-dev \
+                libavcodec-dev libavformat-dev libavutil-dev libswscale-dev libavfilter-dev \
                 libssl-dev libcurl4-openssl-dev \
                 libfmt-dev libzstd-dev libpng-dev liblz4-dev libbz2-dev \
                 libpugixml-dev nlohmann-json3-dev \
@@ -177,7 +177,8 @@ jobs:
                 libglew-dev libsnappy-dev libzip-dev \
                 libfreeimage-dev libfreetype-dev libvlc-dev libpoppler-cpp-dev \
                 libepoxy-dev libpixman-1-dev libgtk-3-dev \
-                libsamplerate0-dev libpcap-dev libglib2.0-dev
+                libsamplerate0-dev libpcap-dev libglib2.0-dev \
+                libfaad-dev libwebp-dev
 
               apt-get clean
               rm -rf /var/lib/apt/lists/*
@@ -358,6 +359,10 @@ jobs:
               set -e
               git clone https://github.com/stenzek/duckstation.git /src
               cd /src && git checkout "$COMMIT" && git submodule update --init --recursive
+
+              # Patch PNG version requirement (Ubuntu 24.04 has 1.6.43, duck wants 1.6.53)
+              sed -i "s/PNG 1.6.53/PNG 1.6.40/" CMakeModules/DuckStationDependencies.cmake || true
+
               mkdir build && cd build
               cmake .. -G Ninja \
                 -DCMAKE_BUILD_TYPE=Release \
