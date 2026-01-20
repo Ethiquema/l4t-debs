@@ -2586,6 +2586,20 @@ Original-Maintainer: GNU Libc Maintainers <debian-glibc@lists.debian.org>
 Original-Vcs-Browser: https://salsa.debian.org/glibc-team/glibc
 Original-Vcs-Git: https://salsa.debian.org/glibc-team/glibc.git
 
+Package: melonds-l4t
+Version: 1.1
+Architecture: arm64
+Maintainer: Ethiquema <noreply@ethiquema.github.io>
+Depends: libc6, libjemalloc2, libqt6widgets6, libqt6gui6, libqt6core6, libqt6multimedia6, libsdl2-2.0-0, libslirp0, libarchive13t64, libzstd1
+Filename: pool/main/melonds-l4t_1.1_arm64.deb
+Size: 1544356
+MD5sum: b4ac161154ad1843bcfe6114730901c8
+SHA1: 4e796c7771d4bedd4d3b77a6d7406a92d222ee04
+SHA256: 0f17abe9e31c3158cc76c2ccf25aabe894e733b80c5a2b8b3b0f3bbd0535486e
+Section: games
+Priority: optional
+Description: melonDS Nintendo DS Emulator (ARM64 L4T build)
+
 Package: nintendo-switch-meta
 Version: 1.0-10+24.04
 Architecture: arm64
@@ -3211,10 +3225,10 @@ Architecture: arm64
 Maintainer: Ethiquema <noreply@ethiquema.github.io>
 Depends: bash
 Filename: pool/main/setperf_1.0.0_arm64.deb
-Size: 4122
-MD5sum: 1d7c790041b31d8f3f5e409d72a7ad26
-SHA1: f3e74ef3370f58ee8513b771c08ea710d9cb179b
-SHA256: f63f8087a480df131699f04141d8e501c756725892421853ec403bb186343e41
+Size: 4124
+MD5sum: 7bfd4ca0293dc520290b2a9ee77ce47a
+SHA1: 33c4b93535320283245faab082acd82b58215aca
+SHA256: 828eebdd90f64c72958a5abadb22776de92732590f196e8e62e77959b598bbb7
 Section: utils
 Priority: optional
 Description: Nintendo Switch performance tuning wrapper
