@@ -3512,6 +3512,22 @@ Priority: required
 Homepage: https://gitlab.com/switchroot
 Description: Metapackage for Unity only Nintendo Switch configuration packages
 
+Package: xemu-l4t
+Version: 0.8.132
+Architecture: arm64
+Maintainer: Ethiquema <noreply@ethiquema.github.io>
+Depends: libfuse2t64 | libfuse2
+Filename: pool/main/xemu-l4t_0.8.132_arm64.deb
+Size: 21845276
+MD5sum: 48a00649e709c8c2a644e03023c7c1d5
+SHA1: 351d48a7d50403ef262c43009ae2f396fe3a49d1
+SHA256: 9bb78840042c0ad8bc6802f09e4745e62cba9385760c75b924b54decf2c0015c
+Section: games
+Priority: optional
+Description: xemu Original Xbox Emulator (ARM64 AppImage)
+ Low-level Xbox emulator with high compatibility.
+ Optimized for Nintendo Switch L4T.
+
 Package: xserver-xorg-core
 Source: xorg-server
 Version: 2:1.20.13-1ubuntu1~20.04.8
