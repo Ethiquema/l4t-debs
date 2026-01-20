@@ -12,6 +12,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: apt-repo-update
+  cancel-in-progress: false
+
 jobs:
   update-repo:
     runs-on: ubuntu-latest

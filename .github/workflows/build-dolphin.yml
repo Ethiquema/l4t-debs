@@ -13,6 +13,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: apt-repo-update
+  cancel-in-progress: false
+
 jobs:
   build-dolphin:
     runs-on: ubuntu-24.04
