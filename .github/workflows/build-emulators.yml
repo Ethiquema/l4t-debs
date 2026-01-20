@@ -675,11 +675,32 @@ jobs:
           path: "*.deb"
           retention-days: 1
 
+  build-setperf:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Build setperf package
+        run: |
+          cd packages/setperf
+          chmod +x build.sh
+          ./build.sh
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: deb-setperf
+          path: "packages/setperf/*.deb"
+          retention-days: 1
+
   # ===========================================================================
   # UPDATE REPO: Collect all debs and update APT repository
   # ===========================================================================
   update-repo:
-    needs: [prepare, build-azahar, build-dolphin, build-duckstation, build-esde, build-melonds, build-ppsspp, build-xemu]
+    needs: [prepare, build-azahar, build-dolphin, build-duckstation, build-esde, build-melonds, build-ppsspp, build-xemu, build-setperf]
     if: always()
     runs-on: ubuntu-24.04
     steps:
