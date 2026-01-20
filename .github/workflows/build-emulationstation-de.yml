@@ -4,6 +4,9 @@ on:
   schedule:
     - cron: '0 4 * * 0'
   workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/build-emulationstation-de.yml'
 
 permissions:
   contents: write
@@ -20,6 +23,14 @@ jobs:
       - name: Check for new ES-DE release
         id: check
         run: |
+          # Force rebuild if workflow file was modified
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "Workflow modified, forcing rebuild"
+            FORCE_BUILD=true
+          else
+            FORCE_BUILD=false
+          fi
+
           # ES-DE uses GitLab, check the API for aarch64 package
           RELEASES=$(curl -fsSL "https://gitlab.com/api/v4/projects/es-de%2Femulationstation-de/releases")
           LATEST_TAG=$(echo "$RELEASES" | jq -r '.[0].tag_name')
@@ -30,7 +41,7 @@ jobs:
             STORED_VERSION=$(cat .esde-version)
           fi
 
-          if [ "$LATEST_TAG" != "$STORED_VERSION" ]; then
+          if [ "$LATEST_TAG" != "$STORED_VERSION" ] || [ "$FORCE_BUILD" = "true" ]; then
             echo "should_build=true" >> $GITHUB_OUTPUT
             echo "version=$LATEST_TAG" >> $GITHUB_OUTPUT
 
@@ -47,6 +58,8 @@ jobs:
         run: |
           set -e
           VERSION="${{ steps.check.outputs.version }}"
+          # Remove 'v' prefix for dpkg compatibility
+          VERSION_CLEAN=$(echo "$VERSION" | sed 's/^v//')
 
           # Download AppImage
           curl -fsSL -o esde.AppImage "${{ steps.check.outputs.appimage_url }}"
@@ -78,7 +91,7 @@ jobs:
 
           cat > esde-pkg/DEBIAN/control << EOF
           Package: emulationstation-de-l4t
-          Version: ${VERSION}
+          Version: ${VERSION_CLEAN}
           Architecture: arm64
           Maintainer: Ethiquema <noreply@ethiquema.github.io>
           Depends: libfuse2t64 | libfuse2
@@ -91,7 +104,7 @@ jobs:
            Optimized for Nintendo Switch L4T.
           EOF
 
-          dpkg-deb --build esde-pkg emulationstation-de-l4t_${VERSION}_arm64.deb
+          dpkg-deb --build esde-pkg emulationstation-de-l4t_${VERSION_CLEAN}_arm64.deb
 
       - name: Save version tracker
         if: steps.check.outputs.should_build == 'true'
@@ -140,8 +153,8 @@ jobs:
           Description: L4T packages for Nintendo Switch
           EOF
           apt-ftparchive release . >> Release
-          gpg --default-key "Ethiquema L4T Repo" -abs -o Release.gpg Release
-          gpg --default-key "Ethiquema L4T Repo" --clearsign -o InRelease Release
+          gpg --batch --default-key "Ethiquema L4T Repo" -abs -o Release.gpg Release
+          gpg --batch --default-key "Ethiquema L4T Repo" --clearsign -o InRelease Release
 
       - name: Deploy to gh-pages
         if: steps.check.outputs.should_build == 'true'

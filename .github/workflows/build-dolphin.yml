@@ -6,6 +6,9 @@ on:
     - cron: '0 4 * * 0'
   workflow_dispatch:
     # Allow manual trigger
+  push:
+    paths:
+      - '.github/workflows/build-dolphin.yml'
 
 permissions:
   contents: write
@@ -19,27 +22,37 @@ jobs:
         with:
           ref: main
 
-      - name: Check for new Dolphin release
+      - name: Check for new Dolphin commits
         id: check
         run: |
-          # Get latest Dolphin release tag
-          LATEST_TAG=$(curl -fsSL https://api.github.com/repos/dolphin-emu/dolphin/releases/latest | jq -r '.tag_name')
-          echo "Latest Dolphin release: $LATEST_TAG"
-
-          # Get stored version
-          STORED_VERSION=""
-          if [ -f .dolphin-version ]; then
-            STORED_VERSION=$(cat .dolphin-version)
+          # Force rebuild if workflow file was modified
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "Workflow modified, forcing rebuild"
+            FORCE_BUILD=true
+          else
+            FORCE_BUILD=false
           fi
-          echo "Stored version: $STORED_VERSION"
 
-          if [ "$LATEST_TAG" != "$STORED_VERSION" ]; then
+          # Dolphin doesn't use GitHub releases, check latest commit on master
+          LATEST_COMMIT=$(curl -fsSL https://api.github.com/repos/dolphin-emu/dolphin/commits/master | jq -r '.sha')
+          SHORT_SHA=${LATEST_COMMIT:0:7}
+          echo "Latest Dolphin commit: $SHORT_SHA"
+
+          # Get stored commit
+          STORED_COMMIT=""
+          if [ -f .dolphin-commit ]; then
+            STORED_COMMIT=$(cat .dolphin-commit)
+          fi
+          echo "Stored commit: ${STORED_COMMIT:0:7}"
+
+          if [ "$LATEST_COMMIT" != "$STORED_COMMIT" ] || [ "$FORCE_BUILD" = "true" ]; then
             echo "should_build=true" >> $GITHUB_OUTPUT
-            echo "version=$LATEST_TAG" >> $GITHUB_OUTPUT
-            echo "New Dolphin release detected: $LATEST_TAG"
+            echo "commit=$LATEST_COMMIT" >> $GITHUB_OUTPUT
+            echo "short_sha=$SHORT_SHA" >> $GITHUB_OUTPUT
+            echo "Build triggered"
           else
             echo "should_build=false" >> $GITHUB_OUTPUT
-            echo "No new release"
+            echo "No new commits"
           fi
 
       - name: Set up QEMU for ARM64
@@ -53,7 +66,8 @@ jobs:
         run: |
           docker run --rm --platform linux/arm64 \
             -v ${{ github.workspace }}:/workspace \
-            -e VERSION=${{ steps.check.outputs.version }} \
+            -e COMMIT=${{ steps.check.outputs.commit }} \
+            -e SHORT_SHA=${{ steps.check.outputs.short_sha }} \
             ubuntu:24.04 bash -c '
               set -e
               export DEBIAN_FRONTEND=noninteractive
@@ -89,9 +103,9 @@ jobs:
                 libpng-dev \
                 libusb-1.0-0-dev \
                 libfmt-dev \
-                qtbase5-dev \
-                qtbase5-private-dev \
-                libqt5svg5-dev \
+                qt6-base-dev \
+                qt6-base-private-dev \
+                libqt6svg6-dev \
                 libxxhash-dev \
                 libspng-dev \
                 libxcb-cursor0 \
@@ -100,8 +114,9 @@ jobs:
 
               echo "=== Cloning Dolphin ==="
               cd /tmp
-              git clone --depth 1 --branch "$VERSION" https://github.com/dolphin-emu/dolphin.git
+              git clone https://github.com/dolphin-emu/dolphin.git
               cd dolphin
+              git checkout "$COMMIT"
               git submodule update --init --recursive
 
               echo "=== Configuring build ==="
@@ -123,8 +138,8 @@ jobs:
               echo "=== Creating .deb package ==="
               DESTDIR=/tmp/dolphin-pkg ninja install
 
-              # Extract version number
-              PKG_VERSION=$(echo "$VERSION" | sed "s/^v//")
+              # Use short SHA as version
+              PKG_VERSION="git-${SHORT_SHA}"
 
               mkdir -p /tmp/dolphin-pkg/DEBIAN
               cat > /tmp/dolphin-pkg/DEBIAN/control << EOF
@@ -132,7 +147,7 @@ jobs:
           Version: ${PKG_VERSION}
           Architecture: arm64
           Maintainer: Ethiquema <noreply@ethiquema.github.io>
-          Depends: libc6, libqt5widgets5, libqt5gui5, libqt5core5a, libavcodec60, libavformat60, libswscale7, libevdev2, libminiupnpc17, libmbedtls21, libcurl4t64, libhidapi-hidraw0, libsystemd0, libbluetooth3, libasound2t64, libpulse0, libpugixml1v5, libbz2-1.0, libzstd1, liblzo2-2, libpng16-16t64, libusb-1.0-0, libfmt9, libsfml-system2.6, libsfml-network2.6, libxxhash0, libspng0
+          Depends: libc6, libqt6widgets6, libqt6gui6, libqt6core6, libavcodec60, libavformat60, libswscale7, libevdev2, libminiupnpc17, libmbedtls21, libcurl4t64, libhidapi-hidraw0, libsystemd0, libbluetooth3, libasound2t64, libpulse0, libpugixml1v5, libbz2-1.0, libzstd1, liblzo2-2, libpng16-16t64, libusb-1.0-0, libfmt9, libsfml-system2.6, libsfml-network2.6, libxxhash0, libspng0
           Section: games
           Priority: optional
           Description: Dolphin GameCube/Wii Emulator (ARM64 L4T build)
@@ -144,10 +159,10 @@ jobs:
               echo "=== Build complete ==="
             '
 
-      - name: Save version tracker
+      - name: Save commit tracker
         if: steps.check.outputs.should_build == 'true'
         run: |
-          echo "${{ steps.check.outputs.version }}" > .dolphin-version
+          echo "${{ steps.check.outputs.commit }}" > .dolphin-commit
 
       - name: Checkout gh-pages
         if: steps.check.outputs.should_build == 'true'
@@ -201,8 +216,8 @@ jobs:
           EOF
 
           apt-ftparchive release . >> Release
-          gpg --default-key "Ethiquema L4T Repo" -abs -o Release.gpg Release
-          gpg --default-key "Ethiquema L4T Repo" --clearsign -o InRelease Release
+          gpg --batch --default-key "Ethiquema L4T Repo" -abs -o Release.gpg Release
+          gpg --batch --default-key "Ethiquema L4T Repo" --clearsign -o InRelease Release
 
       - name: Deploy to gh-pages
         if: steps.check.outputs.should_build == 'true'
@@ -211,7 +226,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "Add Dolphin ${{ steps.check.outputs.version }} ARM64" || echo "No changes"
+          git commit -m "Add Dolphin git-${{ steps.check.outputs.short_sha }} ARM64" || echo "No changes"
           git push origin gh-pages
 
       - name: Save tracker to main
@@ -219,6 +234,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add .dolphin-version
-          git commit -m "Update Dolphin version tracker" || echo "No changes"
+          git add .dolphin-commit
+          git commit -m "Update Dolphin commit tracker" || echo "No changes"
           git push origin main

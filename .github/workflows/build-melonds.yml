@@ -4,6 +4,9 @@ on:
   schedule:
     - cron: '0 4 * * 0'
   workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/build-melonds.yml'
 
 permissions:
   contents: write
@@ -20,6 +23,14 @@ jobs:
       - name: Check for new melonDS release
         id: check
         run: |
+          # Force rebuild if workflow file was modified
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "Workflow modified, forcing rebuild"
+            FORCE_BUILD=true
+          else
+            FORCE_BUILD=false
+          fi
+
           RELEASE_INFO=$(curl -fsSL https://api.github.com/repos/melonDS-emu/melonDS/releases/latest)
           LATEST_TAG=$(echo "$RELEASE_INFO" | jq -r '.tag_name')
           echo "Latest melonDS release: $LATEST_TAG"
@@ -29,7 +40,7 @@ jobs:
             STORED_VERSION=$(cat .melonds-version)
           fi
 
-          if [ "$LATEST_TAG" != "$STORED_VERSION" ]; then
+          if [ "$LATEST_TAG" != "$STORED_VERSION" ] || [ "$FORCE_BUILD" = "true" ]; then
             echo "should_build=true" >> $GITHUB_OUTPUT
             echo "version=$LATEST_TAG" >> $GITHUB_OUTPUT
 
@@ -139,8 +150,8 @@ jobs:
           Description: L4T packages for Nintendo Switch
           EOF
           apt-ftparchive release . >> Release
-          gpg --default-key "Ethiquema L4T Repo" -abs -o Release.gpg Release
-          gpg --default-key "Ethiquema L4T Repo" --clearsign -o InRelease Release
+          gpg --batch --default-key "Ethiquema L4T Repo" -abs -o Release.gpg Release
+          gpg --batch --default-key "Ethiquema L4T Repo" --clearsign -o InRelease Release
 
       - name: Deploy to gh-pages
         if: steps.check.outputs.should_build == 'true'

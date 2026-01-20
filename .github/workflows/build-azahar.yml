@@ -6,6 +6,9 @@ on:
     - cron: '0 5 * * 0'
   workflow_dispatch:
     # Allow manual trigger
+  push:
+    paths:
+      - '.github/workflows/build-azahar.yml'
 
 permissions:
   contents: write
@@ -22,6 +25,14 @@ jobs:
       - name: Check for new Azahar release
         id: check
         run: |
+          # Force rebuild if workflow file was modified
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "Workflow modified, forcing rebuild"
+            FORCE_BUILD=true
+          else
+            FORCE_BUILD=false
+          fi
+
           # Get latest Azahar release tag
           LATEST_TAG=$(curl -fsSL https://api.github.com/repos/azahar-emu/azahar/releases/latest | jq -r '.tag_name')
           echo "Latest Azahar release: $LATEST_TAG"
@@ -33,10 +44,10 @@ jobs:
           fi
           echo "Stored version: $STORED_VERSION"
 
-          if [ "$LATEST_TAG" != "$STORED_VERSION" ]; then
+          if [ "$LATEST_TAG" != "$STORED_VERSION" ] || [ "$FORCE_BUILD" = "true" ]; then
             echo "should_build=true" >> $GITHUB_OUTPUT
             echo "version=$LATEST_TAG" >> $GITHUB_OUTPUT
-            echo "New Azahar release detected: $LATEST_TAG"
+            echo "Build triggered: $LATEST_TAG"
           else
             echo "should_build=false" >> $GITHUB_OUTPUT
             echo "No new release"
@@ -70,9 +81,9 @@ jobs:
                 llvm \
                 libc++-dev \
                 libc++abi-dev \
-                qtbase5-dev \
-                qtmultimedia5-dev \
-                libqt5opengl5-dev \
+                qt6-base-dev \
+                qt6-multimedia-dev \
+                libqt6opengl6-dev \
                 libsdl2-dev \
                 libssl-dev \
                 libavcodec-dev \
@@ -126,7 +137,7 @@ jobs:
           Version: ${VERSION}
           Architecture: arm64
           Maintainer: Ethiquema <noreply@ethiquema.github.io>
-          Depends: libc6, libqt5widgets5, libqt5gui5, libqt5core5a, libqt5multimedia5, libqt5opengl5, libsdl2-2.0-0, libssl3t64, libavcodec60, libavformat60, libswscale7, libspeexdsp1, libfmt9, libzstd1, libusb-1.0-0, libhidapi-hidraw0, libboost-serialization1.83.0, libenet7, liblz4-1
+          Depends: libc6, libqt6widgets6, libqt6gui6, libqt6core6, libqt6multimedia6, libqt6opengl6, libsdl2-2.0-0, libssl3t64, libavcodec60, libavformat60, libswscale7, libspeexdsp1, libfmt9, libzstd1, libusb-1.0-0, libhidapi-hidraw0, libboost-serialization1.83.0, libenet7, liblz4-1
           Provides: citra
           Replaces: citra
           Section: games
@@ -197,8 +208,8 @@ jobs:
           EOF
 
           apt-ftparchive release . >> Release
-          gpg --default-key "Ethiquema L4T Repo" -abs -o Release.gpg Release
-          gpg --default-key "Ethiquema L4T Repo" --clearsign -o InRelease Release
+          gpg --batch --default-key "Ethiquema L4T Repo" -abs -o Release.gpg Release
+          gpg --batch --default-key "Ethiquema L4T Repo" --clearsign -o InRelease Release
 
       - name: Deploy to gh-pages
         if: steps.check.outputs.should_build == 'true'
