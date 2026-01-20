@@ -11,71 +11,148 @@ on:
 permissions:
   contents: write
 
+env:
+  CACHE_KEY: emu-deps-v1
+
 jobs:
-  build:
+  # ===========================================================================
+  # PREPARE: Create and cache base image with all dependencies
+  # ===========================================================================
+  prepare:
     runs-on: ubuntu-24.04
+    outputs:
+      azahar_version: ${{ steps.versions.outputs.azahar_version }}
+      dolphin_commit: ${{ steps.versions.outputs.dolphin_commit }}
+      dolphin_short: ${{ steps.versions.outputs.dolphin_short }}
+      duck_commit: ${{ steps.versions.outputs.duck_commit }}
+      duck_short: ${{ steps.versions.outputs.duck_short }}
+      esde_version: ${{ steps.versions.outputs.esde_version }}
+      melonds_version: ${{ steps.versions.outputs.melonds_version }}
+      ppsspp_version: ${{ steps.versions.outputs.ppsspp_version }}
+      xemu_version: ${{ steps.versions.outputs.xemu_version }}
+      build_azahar: ${{ steps.versions.outputs.build_azahar }}
+      build_dolphin: ${{ steps.versions.outputs.build_dolphin }}
+      build_duckstation: ${{ steps.versions.outputs.build_duckstation }}
+      build_esde: ${{ steps.versions.outputs.build_esde }}
+      build_melonds: ${{ steps.versions.outputs.build_melonds }}
+      build_ppsspp: ${{ steps.versions.outputs.build_ppsspp }}
+      build_xemu: ${{ steps.versions.outputs.build_xemu }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           ref: main
 
-      - name: Set up QEMU for ARM64
+      - name: Fetch latest versions and check for updates
+        id: versions
+        run: |
+          # Fetch current versions from repo
+          CURRENT_AZAHAR=$(cat .azahar-version 2>/dev/null || echo "")
+          CURRENT_DOLPHIN=$(cat .dolphin-commit 2>/dev/null || echo "")
+          CURRENT_DUCK=$(cat .duckstation-commit 2>/dev/null || echo "")
+          CURRENT_ESDE=$(cat .esde-version 2>/dev/null || echo "")
+          CURRENT_MELON=$(cat .melonds-version 2>/dev/null || echo "")
+          CURRENT_PPSSPP=$(cat .ppsspp-version 2>/dev/null || echo "")
+          CURRENT_XEMU=$(cat .xemu-version 2>/dev/null || echo "")
+
+          # Fetch latest versions from upstream
+          AZAHAR_TAG=$(curl -fsSL https://api.github.com/repos/azahar-emu/azahar/releases/latest | jq -r '.tag_name')
+          DOLPHIN_COMMIT=$(curl -fsSL https://api.github.com/repos/dolphin-emu/dolphin/commits/master | jq -r '.sha')
+          DUCK_COMMIT=$(curl -fsSL https://api.github.com/repos/stenzek/duckstation/commits/master | jq -r '.sha')
+          ESDE_TAG=$(curl -fsSL "https://gitlab.com/api/v4/projects/es-de%2Femulationstation-de/releases" | jq -r '.[0].tag_name')
+          MELON_TAG=$(curl -fsSL https://api.github.com/repos/melonDS-emu/melonDS/releases/latest | jq -r '.tag_name')
+          PPSSPP_TAG=$(curl -fsSL https://api.github.com/repos/hrydgard/ppsspp/releases/latest | jq -r '.tag_name')
+          XEMU_TAG=$(curl -fsSL https://api.github.com/repos/xemu-project/xemu/releases/latest | jq -r '.tag_name')
+
+          # Output versions
+          echo "azahar_version=$AZAHAR_TAG" >> $GITHUB_OUTPUT
+          echo "dolphin_commit=$DOLPHIN_COMMIT" >> $GITHUB_OUTPUT
+          echo "dolphin_short=${DOLPHIN_COMMIT:0:7}" >> $GITHUB_OUTPUT
+          echo "duck_commit=$DUCK_COMMIT" >> $GITHUB_OUTPUT
+          echo "duck_short=${DUCK_COMMIT:0:7}" >> $GITHUB_OUTPUT
+          echo "esde_version=$ESDE_TAG" >> $GITHUB_OUTPUT
+          echo "melonds_version=$MELON_TAG" >> $GITHUB_OUTPUT
+          echo "ppsspp_version=$PPSSPP_TAG" >> $GITHUB_OUTPUT
+          echo "xemu_version=$XEMU_TAG" >> $GITHUB_OUTPUT
+
+          # Force rebuild on workflow changes or manual dispatch
+          FORCE_REBUILD="${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}"
+
+          # Check if updates are needed (or force rebuild)
+          if [[ "$FORCE_REBUILD" == "true" ]] || [[ "$AZAHAR_TAG" != "$CURRENT_AZAHAR" ]]; then
+            echo "build_azahar=true" >> $GITHUB_OUTPUT
+          else
+            echo "build_azahar=false" >> $GITHUB_OUTPUT
+          fi
+
+          if [[ "$FORCE_REBUILD" == "true" ]] || [[ "$DOLPHIN_COMMIT" != "$CURRENT_DOLPHIN" ]]; then
+            echo "build_dolphin=true" >> $GITHUB_OUTPUT
+          else
+            echo "build_dolphin=false" >> $GITHUB_OUTPUT
+          fi
+
+          if [[ "$FORCE_REBUILD" == "true" ]] || [[ "$DUCK_COMMIT" != "$CURRENT_DUCK" ]]; then
+            echo "build_duckstation=true" >> $GITHUB_OUTPUT
+          else
+            echo "build_duckstation=false" >> $GITHUB_OUTPUT
+          fi
+
+          if [[ "$FORCE_REBUILD" == "true" ]] || [[ "$ESDE_TAG" != "$CURRENT_ESDE" ]]; then
+            echo "build_esde=true" >> $GITHUB_OUTPUT
+          else
+            echo "build_esde=false" >> $GITHUB_OUTPUT
+          fi
+
+          if [[ "$FORCE_REBUILD" == "true" ]] || [[ "$MELON_TAG" != "$CURRENT_MELON" ]]; then
+            echo "build_melonds=true" >> $GITHUB_OUTPUT
+          else
+            echo "build_melonds=false" >> $GITHUB_OUTPUT
+          fi
+
+          if [[ "$FORCE_REBUILD" == "true" ]] || [[ "$PPSSPP_TAG" != "$CURRENT_PPSSPP" ]]; then
+            echo "build_ppsspp=true" >> $GITHUB_OUTPUT
+          else
+            echo "build_ppsspp=false" >> $GITHUB_OUTPUT
+          fi
+
+          if [[ "$FORCE_REBUILD" == "true" ]] || [[ "$XEMU_TAG" != "$CURRENT_XEMU" ]]; then
+            echo "build_xemu=true" >> $GITHUB_OUTPUT
+          else
+            echo "build_xemu=false" >> $GITHUB_OUTPUT
+          fi
+
+          echo "Force rebuild: $FORCE_REBUILD"
+
+          # Log status
+          echo "=== Build status ==="
+          echo "Azahar: $CURRENT_AZAHAR -> $AZAHAR_TAG"
+          echo "Dolphin: ${CURRENT_DOLPHIN:0:7} -> ${DOLPHIN_COMMIT:0:7}"
+          echo "DuckStation: ${CURRENT_DUCK:0:7} -> ${DUCK_COMMIT:0:7}"
+          echo "ES-DE: $CURRENT_ESDE -> $ESDE_TAG"
+          echo "melonDS: $CURRENT_MELON -> $MELON_TAG"
+          echo "PPSSPP: $CURRENT_PPSSPP -> $PPSSPP_TAG"
+          echo "xemu: $CURRENT_XEMU -> $XEMU_TAG"
+
+      - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
         with:
           platforms: arm64
 
-      - name: Fetch latest versions
-        id: versions
+      - name: Cache Docker image
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: /tmp/emu-deps.tar
+          key: ${{ env.CACHE_KEY }}
+
+      - name: Build and cache base image
+        if: steps.cache.outputs.cache-hit != 'true'
         run: |
-          # Azahar
-          AZAHAR_TAG=$(curl -fsSL https://api.github.com/repos/azahar-emu/azahar/releases/latest | jq -r '.tag_name')
-          echo "azahar_version=$AZAHAR_TAG" >> $GITHUB_OUTPUT
-
-          # Dolphin
-          DOLPHIN_COMMIT=$(curl -fsSL https://api.github.com/repos/dolphin-emu/dolphin/commits/master | jq -r '.sha')
-          echo "dolphin_commit=$DOLPHIN_COMMIT" >> $GITHUB_OUTPUT
-          echo "dolphin_short=${DOLPHIN_COMMIT:0:7}" >> $GITHUB_OUTPUT
-
-          # DuckStation
-          DUCK_COMMIT=$(curl -fsSL https://api.github.com/repos/stenzek/duckstation/commits/master | jq -r '.sha')
-          echo "duck_commit=$DUCK_COMMIT" >> $GITHUB_OUTPUT
-          echo "duck_short=${DUCK_COMMIT:0:7}" >> $GITHUB_OUTPUT
-
-          # EmulationStation-DE
-          ESDE_TAG=$(curl -fsSL "https://gitlab.com/api/v4/projects/es-de%2Femulationstation-de/releases" | jq -r '.[0].tag_name')
-          echo "esde_version=$ESDE_TAG" >> $GITHUB_OUTPUT
-
-          # melonDS
-          MELON_TAG=$(curl -fsSL https://api.github.com/repos/melonDS-emu/melonDS/releases/latest | jq -r '.tag_name')
-          echo "melonds_version=$MELON_TAG" >> $GITHUB_OUTPUT
-
-          # PPSSPP
-          PPSSPP_TAG=$(curl -fsSL https://api.github.com/repos/hrydgard/ppsspp/releases/latest | jq -r '.tag_name')
-          echo "ppsspp_version=$PPSSPP_TAG" >> $GITHUB_OUTPUT
-
-          # xemu
-          XEMU_TAG=$(curl -fsSL https://api.github.com/repos/xemu-project/xemu/releases/latest | jq -r '.tag_name')
-          echo "xemu_version=$XEMU_TAG" >> $GITHUB_OUTPUT
-
-      - name: Create ARM64 container with all dependencies
-        run: |
-          docker run --name emu-builder --platform linux/arm64 \
-            -v ${{ github.workspace }}:/workspace \
-            -e AZAHAR_VERSION=${{ steps.versions.outputs.azahar_version }} \
-            -e DOLPHIN_COMMIT=${{ steps.versions.outputs.dolphin_commit }} \
-            -e DOLPHIN_SHORT=${{ steps.versions.outputs.dolphin_short }} \
-            -e DUCK_COMMIT=${{ steps.versions.outputs.duck_commit }} \
-            -e DUCK_SHORT=${{ steps.versions.outputs.duck_short }} \
-            -e ESDE_VERSION=${{ steps.versions.outputs.esde_version }} \
-            -e MELONDS_VERSION=${{ steps.versions.outputs.melonds_version }} \
-            -e PPSSPP_VERSION=${{ steps.versions.outputs.ppsspp_version }} \
-            -e XEMU_VERSION=${{ steps.versions.outputs.xemu_version }} \
+          docker run --name emu-deps --platform linux/arm64 \
             ubuntu:24.04 bash -c '
               set -e
               export DEBIAN_FRONTEND=noninteractive
 
-              echo "=== Installing all build dependencies ==="
               apt-get update
               apt-get install -y \
                 build-essential cmake ninja-build git pkg-config meson dpkg-dev \
@@ -102,56 +179,46 @@ jobs:
                 libepoxy-dev libpixman-1-dev libgtk-3-dev \
                 libsamplerate0-dev libpcap-dev libglib2.0-dev
 
-              echo "=== Cloning all repositories ==="
-
-              # Azahar
-              git clone --depth 1 --branch "$AZAHAR_VERSION" --recurse-submodules \
-                https://github.com/azahar-emu/azahar.git /src/azahar
-
-              # Dolphin
-              git clone https://github.com/dolphin-emu/dolphin.git /src/dolphin
-              cd /src/dolphin && git checkout "$DOLPHIN_COMMIT" && git submodule update --init --recursive
-
-              # DuckStation
-              git clone https://github.com/stenzek/duckstation.git /src/duckstation
-              cd /src/duckstation && git checkout "$DUCK_COMMIT" && git submodule update --init --recursive
-
-              # EmulationStation-DE
-              git clone --depth 1 --branch "$ESDE_VERSION" \
-                https://gitlab.com/es-de/emulationstation-de.git /src/esde
-
-              # melonDS
-              git clone --depth 1 --branch "$MELONDS_VERSION" \
-                https://github.com/melonDS-emu/melonDS.git /src/melonds
-
-              # PPSSPP
-              git clone --depth 1 --branch "$PPSSPP_VERSION" --recurse-submodules \
-                https://github.com/hrydgard/ppsspp.git /src/ppsspp
-
-              # xemu
-              git clone --depth 1 --branch "$XEMU_VERSION" \
-                https://github.com/xemu-project/xemu.git /src/xemu
-              cd /src/xemu && git submodule update --init --recursive
-
-              echo "=== Dependencies installed, repos cloned ==="
+              apt-get clean
+              rm -rf /var/lib/apt/lists/*
             '
-          docker commit emu-builder emu-builder-image
-          docker rm emu-builder
+          docker commit emu-deps emu-deps-image
+          docker save emu-deps-image -o /tmp/emu-deps.tar
+          docker rm emu-deps
 
-      # =========================================================================
-      # BUILD STEPS
-      # =========================================================================
+  # ===========================================================================
+  # BUILD JOBS (parallel)
+  # ===========================================================================
+
+  build-azahar:
+    needs: prepare
+    if: needs.prepare.outputs.build_azahar == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Restore cached image
+        uses: actions/cache@v4
+        with:
+          path: /tmp/emu-deps.tar
+          key: ${{ env.CACHE_KEY }}
+
+      - name: Load image
+        run: docker load -i /tmp/emu-deps.tar
 
       - name: Build Azahar
-        continue-on-error: true
         run: |
           docker run --rm --platform linux/arm64 \
             -v ${{ github.workspace }}:/workspace \
-            emu-builder-image bash -c '
+            -e VERSION=${{ needs.prepare.outputs.azahar_version }} \
+            emu-deps-image bash -c '
               set -e
-              echo "=== Building Azahar ==="
-              cd /src/azahar
-              mkdir -p build && cd build
+              git clone --depth 1 --branch "$VERSION" --recurse-submodules \
+                https://github.com/azahar-emu/azahar.git /src
+              cd /src && mkdir build && cd build
               cmake .. -G Ninja \
                 -DCMAKE_BUILD_TYPE=Release \
                 -DCMAKE_INSTALL_PREFIX=/usr \
@@ -169,20 +236,62 @@ jobs:
                 -DENABLE_WEB_SERVICE=OFF \
                 -DENABLE_X11=OFF
               ninja -j$(nproc)
-              DESTDIR=/pkg/azahar ninja install
+              DESTDIR=/tmp/pkg ninja install
+
+              VERSION_CLEAN=$(echo "$VERSION" | sed "s/^v//")
+              mkdir -p /tmp/pkg/DEBIAN
+              cat > /tmp/pkg/DEBIAN/control << EOF
+          Package: azahar-emu-l4t
+          Version: ${VERSION_CLEAN}
+          Architecture: arm64
+          Maintainer: Ethiquema <noreply@ethiquema.github.io>
+          Depends: libc6, libjemalloc2, libqt6widgets6, libqt6gui6, libqt6core6, libqt6multimedia6, libqt6opengl6, libsdl2-2.0-0, libssl3t64, libavcodec60, libavformat60, libswscale7, libspeexdsp1, libfmt9, libzstd1, libusb-1.0-0, libhidapi-hidraw0, libboost-serialization1.83.0, libenet7, liblz4-1
+          Provides: citra
+          Replaces: citra
+          Section: games
+          Priority: optional
+          Description: Azahar 3DS Emulator (ARM64 L4T build)
+          EOF
+              dpkg-deb --build /tmp/pkg /workspace/azahar-emu-l4t_${VERSION_CLEAN}_arm64.deb
             '
-          docker commit $(docker ps -lq) emu-builder-image
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: deb-azahar
+          path: "*.deb"
+          retention-days: 1
+
+  build-dolphin:
+    needs: prepare
+    if: needs.prepare.outputs.build_dolphin == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Restore cached image
+        uses: actions/cache@v4
+        with:
+          path: /tmp/emu-deps.tar
+          key: ${{ env.CACHE_KEY }}
+
+      - name: Load image
+        run: docker load -i /tmp/emu-deps.tar
 
       - name: Build Dolphin
-        continue-on-error: true
         run: |
           docker run --rm --platform linux/arm64 \
             -v ${{ github.workspace }}:/workspace \
-            emu-builder-image bash -c '
+            -e COMMIT=${{ needs.prepare.outputs.dolphin_commit }} \
+            -e SHORT=${{ needs.prepare.outputs.dolphin_short }} \
+            emu-deps-image bash -c '
               set -e
-              echo "=== Building Dolphin ==="
-              cd /src/dolphin
-              mkdir -p build && cd build
+              git clone https://github.com/dolphin-emu/dolphin.git /src
+              cd /src && git checkout "$COMMIT" && git submodule update --init --recursive
+              mkdir build && cd build
               cmake .. -G Ninja \
                 -DCMAKE_BUILD_TYPE=Release \
                 -DCMAKE_INSTALL_PREFIX=/usr \
@@ -196,20 +305,60 @@ jobs:
                 -DENABLE_TESTS=OFF \
                 -DENABLE_ANALYTICS=OFF
               ninja -j$(nproc)
-              DESTDIR=/pkg/dolphin ninja install
+              DESTDIR=/tmp/pkg ninja install
+
+              PKG_VERSION="0.0.0+git.${SHORT}"
+              mkdir -p /tmp/pkg/DEBIAN
+              cat > /tmp/pkg/DEBIAN/control << EOF
+          Package: dolphin-emu-l4t
+          Version: ${PKG_VERSION}
+          Architecture: arm64
+          Maintainer: Ethiquema <noreply@ethiquema.github.io>
+          Depends: libc6, libjemalloc2, libqt6widgets6, libqt6gui6, libqt6core6, libavcodec60, libavformat60, libswscale7, libevdev2, libminiupnpc17, libmbedtls21, libcurl4t64, libhidapi-hidraw0, libsystemd0, libbluetooth3, libasound2t64, libpulse0, libpugixml1v5, libbz2-1.0, libzstd1, liblzo2-2, libpng16-16t64, libusb-1.0-0, libfmt9, libsfml-system2.6, libsfml-network2.6, libxxhash0, libspng0
+          Section: games
+          Priority: optional
+          Description: Dolphin GameCube/Wii Emulator (ARM64 L4T build)
+          EOF
+              dpkg-deb --build /tmp/pkg /workspace/dolphin-emu-l4t_${PKG_VERSION}_arm64.deb
             '
-          docker commit $(docker ps -lq) emu-builder-image
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: deb-dolphin
+          path: "*.deb"
+          retention-days: 1
+
+  build-duckstation:
+    needs: prepare
+    if: needs.prepare.outputs.build_duckstation == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Restore cached image
+        uses: actions/cache@v4
+        with:
+          path: /tmp/emu-deps.tar
+          key: ${{ env.CACHE_KEY }}
+
+      - name: Load image
+        run: docker load -i /tmp/emu-deps.tar
 
       - name: Build DuckStation
-        continue-on-error: true
         run: |
           docker run --rm --platform linux/arm64 \
             -v ${{ github.workspace }}:/workspace \
-            emu-builder-image bash -c '
+            -e COMMIT=${{ needs.prepare.outputs.duck_commit }} \
+            -e SHORT=${{ needs.prepare.outputs.duck_short }} \
+            emu-deps-image bash -c '
               set -e
-              echo "=== Building DuckStation ==="
-              cd /src/duckstation
-              mkdir -p build && cd build
+              git clone https://github.com/stenzek/duckstation.git /src
+              cd /src && git checkout "$COMMIT" && git submodule update --init --recursive
+              mkdir build && cd build
               cmake .. -G Ninja \
                 -DCMAKE_BUILD_TYPE=Release \
                 -DCMAKE_INSTALL_PREFIX=/usr \
@@ -222,40 +371,120 @@ jobs:
                 -DENABLE_WAYLAND=ON \
                 -DENABLE_X11=OFF
               ninja -j$(nproc)
-              DESTDIR=/pkg/duckstation ninja install
+              DESTDIR=/tmp/pkg ninja install
+
+              PKG_VERSION="0.0.0+git.${SHORT}"
+              mkdir -p /tmp/pkg/DEBIAN
+              cat > /tmp/pkg/DEBIAN/control << EOF
+          Package: duckstation-l4t
+          Version: ${PKG_VERSION}
+          Architecture: arm64
+          Maintainer: Ethiquema <noreply@ethiquema.github.io>
+          Depends: libc6, libjemalloc2, libqt6widgets6, libqt6gui6, libqt6core6, libsdl2-2.0-0, libcurl4t64
+          Section: games
+          Priority: optional
+          Description: DuckStation PS1 Emulator (ARM64 L4T build)
+          EOF
+              dpkg-deb --build /tmp/pkg /workspace/duckstation-l4t_${PKG_VERSION}_arm64.deb
             '
-          docker commit $(docker ps -lq) emu-builder-image
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: deb-duckstation
+          path: "*.deb"
+          retention-days: 1
+
+  build-esde:
+    needs: prepare
+    if: needs.prepare.outputs.build_esde == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Restore cached image
+        uses: actions/cache@v4
+        with:
+          path: /tmp/emu-deps.tar
+          key: ${{ env.CACHE_KEY }}
+
+      - name: Load image
+        run: docker load -i /tmp/emu-deps.tar
 
       - name: Build EmulationStation-DE
-        continue-on-error: true
         run: |
           docker run --rm --platform linux/arm64 \
             -v ${{ github.workspace }}:/workspace \
-            emu-builder-image bash -c '
+            -e VERSION=${{ needs.prepare.outputs.esde_version }} \
+            emu-deps-image bash -c '
               set -e
-              echo "=== Building EmulationStation-DE ==="
-              cd /src/esde
-              mkdir -p build && cd build
+              git clone --depth 1 --branch "$VERSION" \
+                https://gitlab.com/es-de/emulationstation-de.git /src
+              cd /src && mkdir build && cd build
               cmake .. -G Ninja \
                 -DCMAKE_BUILD_TYPE=Release \
                 -DCMAKE_INSTALL_PREFIX=/usr \
                 -DCMAKE_C_FLAGS="-O3 -flto -march=armv8-a+crc+simd -mtune=cortex-a57" \
                 -DCMAKE_CXX_FLAGS="-O3 -flto -march=armv8-a+crc+simd -mtune=cortex-a57"
               ninja -j$(nproc)
-              DESTDIR=/pkg/esde ninja install
+              DESTDIR=/tmp/pkg ninja install
+
+              VERSION_CLEAN=$(echo "$VERSION" | sed "s/^v//")
+              mkdir -p /tmp/pkg/DEBIAN
+              cat > /tmp/pkg/DEBIAN/control << EOF
+          Package: emulationstation-de-l4t
+          Version: ${VERSION_CLEAN}
+          Architecture: arm64
+          Maintainer: Ethiquema <noreply@ethiquema.github.io>
+          Depends: libc6, libsdl2-2.0-0, libavcodec60, libavformat60, libswscale7, libfreeimage3t64, libfreetype6, libcurl4t64, libpugixml1v5, libvlc5, libpoppler-cpp0t64
+          Provides: emulationstation
+          Conflicts: emulationstation
+          Section: games
+          Priority: optional
+          Description: EmulationStation Desktop Edition (ARM64 L4T build)
+          EOF
+              dpkg-deb --build /tmp/pkg /workspace/emulationstation-de-l4t_${VERSION_CLEAN}_arm64.deb
             '
-          docker commit $(docker ps -lq) emu-builder-image
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: deb-esde
+          path: "*.deb"
+          retention-days: 1
+
+  build-melonds:
+    needs: prepare
+    if: needs.prepare.outputs.build_melonds == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Restore cached image
+        uses: actions/cache@v4
+        with:
+          path: /tmp/emu-deps.tar
+          key: ${{ env.CACHE_KEY }}
+
+      - name: Load image
+        run: docker load -i /tmp/emu-deps.tar
 
       - name: Build melonDS
-        continue-on-error: true
         run: |
           docker run --rm --platform linux/arm64 \
             -v ${{ github.workspace }}:/workspace \
-            emu-builder-image bash -c '
+            -e VERSION=${{ needs.prepare.outputs.melonds_version }} \
+            emu-deps-image bash -c '
               set -e
-              echo "=== Building melonDS ==="
-              cd /src/melonds
-              mkdir -p build && cd build
+              git clone --depth 1 --branch "$VERSION" \
+                https://github.com/melonDS-emu/melonDS.git /src
+              cd /src && mkdir build && cd build
               cmake .. -G Ninja \
                 -DCMAKE_BUILD_TYPE=Release \
                 -DCMAKE_INSTALL_PREFIX=/usr \
@@ -265,20 +494,59 @@ jobs:
                 -DCMAKE_SHARED_LINKER_FLAGS="-ljemalloc" \
                 -DENABLE_WAYLAND=ON
               ninja -j$(nproc)
-              DESTDIR=/pkg/melonds ninja install
+              DESTDIR=/tmp/pkg ninja install
+
+              VERSION_CLEAN=$(echo "$VERSION" | sed "s/^v//")
+              mkdir -p /tmp/pkg/DEBIAN
+              cat > /tmp/pkg/DEBIAN/control << EOF
+          Package: melonds-l4t
+          Version: ${VERSION_CLEAN}
+          Architecture: arm64
+          Maintainer: Ethiquema <noreply@ethiquema.github.io>
+          Depends: libc6, libjemalloc2, libqt6widgets6, libqt6gui6, libqt6core6, libqt6multimedia6, libsdl2-2.0-0, libslirp0, libarchive13t64, libzstd1
+          Section: games
+          Priority: optional
+          Description: melonDS Nintendo DS Emulator (ARM64 L4T build)
+          EOF
+              dpkg-deb --build /tmp/pkg /workspace/melonds-l4t_${VERSION_CLEAN}_arm64.deb
             '
-          docker commit $(docker ps -lq) emu-builder-image
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: deb-melonds
+          path: "*.deb"
+          retention-days: 1
+
+  build-ppsspp:
+    needs: prepare
+    if: needs.prepare.outputs.build_ppsspp == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Restore cached image
+        uses: actions/cache@v4
+        with:
+          path: /tmp/emu-deps.tar
+          key: ${{ env.CACHE_KEY }}
+
+      - name: Load image
+        run: docker load -i /tmp/emu-deps.tar
 
       - name: Build PPSSPP
-        continue-on-error: true
         run: |
           docker run --rm --platform linux/arm64 \
             -v ${{ github.workspace }}:/workspace \
-            emu-builder-image bash -c '
+            -e VERSION=${{ needs.prepare.outputs.ppsspp_version }} \
+            emu-deps-image bash -c '
               set -e
-              echo "=== Building PPSSPP ==="
-              cd /src/ppsspp
-              mkdir -p build && cd build
+              git clone --depth 1 --branch "$VERSION" --recurse-submodules \
+                https://github.com/hrydgard/ppsspp.git /src
+              cd /src && mkdir build && cd build
               cmake .. -G Ninja \
                 -DCMAKE_BUILD_TYPE=Release \
                 -DCMAKE_INSTALL_PREFIX=/usr \
@@ -292,11 +560,11 @@ jobs:
                 -DVULKAN=ON
               ninja -j$(nproc)
 
-              mkdir -p /pkg/ppsspp/usr/bin /pkg/ppsspp/usr/share/applications /pkg/ppsspp/usr/share/ppsspp
-              cp PPSSPPSDL /pkg/ppsspp/usr/bin/ppsspp
-              cp -r ../assets /pkg/ppsspp/usr/share/ppsspp/
+              mkdir -p /tmp/pkg/usr/bin /tmp/pkg/usr/share/applications /tmp/pkg/usr/share/ppsspp
+              cp PPSSPPSDL /tmp/pkg/usr/bin/ppsspp
+              cp -r ../assets /tmp/pkg/usr/share/ppsspp/
 
-              cat > /pkg/ppsspp/usr/share/applications/ppsspp.desktop << DESK
+              cat > /tmp/pkg/usr/share/applications/ppsspp.desktop << DESK
           [Desktop Entry]
           Name=PPSSPP
           Comment=PlayStation Portable Emulator
@@ -306,27 +574,70 @@ jobs:
           Type=Application
           Categories=Game;Emulator;
           DESK
+
+              VERSION_CLEAN=$(echo "$VERSION" | sed "s/^v//")
+              mkdir -p /tmp/pkg/DEBIAN
+              cat > /tmp/pkg/DEBIAN/control << EOF
+          Package: ppsspp-l4t
+          Version: ${VERSION_CLEAN}
+          Architecture: arm64
+          Maintainer: Ethiquema <noreply@ethiquema.github.io>
+          Depends: libc6, libjemalloc2, libsdl2-2.0-0, libsdl2-ttf-2.0-0, libglew2.2, libsnappy1v5, libavcodec60, libavformat60, libswscale7, libzip4t64, libpng16-16t64
+          Provides: ppsspp
+          Conflicts: ppsspp
+          Section: games
+          Priority: optional
+          Description: PPSSPP PlayStation Portable Emulator (ARM64 L4T build)
+          EOF
+              dpkg-deb --build /tmp/pkg /workspace/ppsspp-l4t_${VERSION_CLEAN}_arm64.deb
             '
-          docker commit $(docker ps -lq) emu-builder-image
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: deb-ppsspp
+          path: "*.deb"
+          retention-days: 1
+
+  build-xemu:
+    needs: prepare
+    if: needs.prepare.outputs.build_xemu == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Restore cached image
+        uses: actions/cache@v4
+        with:
+          path: /tmp/emu-deps.tar
+          key: ${{ env.CACHE_KEY }}
+
+      - name: Load image
+        run: docker load -i /tmp/emu-deps.tar
 
       - name: Build xemu
-        continue-on-error: true
         run: |
           docker run --rm --platform linux/arm64 \
             -v ${{ github.workspace }}:/workspace \
-            emu-builder-image bash -c '
+            -e VERSION=${{ needs.prepare.outputs.xemu_version }} \
+            emu-deps-image bash -c '
               set -e
-              echo "=== Building xemu ==="
-              cd /src/xemu
+              git clone --depth 1 --branch "$VERSION" \
+                https://github.com/xemu-project/xemu.git /src
+              cd /src && git submodule update --init --recursive
+
               export CFLAGS="-O3 -flto -march=armv8-a+crc+simd -mtune=cortex-a57"
               export CXXFLAGS="-O3 -flto -march=armv8-a+crc+simd -mtune=cortex-a57"
               export LDFLAGS="-ljemalloc"
               ./build.sh
 
-              mkdir -p /pkg/xemu/usr/bin /pkg/xemu/usr/share/applications
-              cp dist/xemu /pkg/xemu/usr/bin/
+              mkdir -p /tmp/pkg/usr/bin /tmp/pkg/usr/share/applications
+              cp dist/xemu /tmp/pkg/usr/bin/
 
-              cat > /pkg/xemu/usr/share/applications/xemu.desktop << DESK
+              cat > /tmp/pkg/usr/share/applications/xemu.desktop << DESK
           [Desktop Entry]
           Name=xemu
           Comment=Original Xbox Emulator
@@ -336,203 +647,35 @@ jobs:
           Type=Application
           Categories=Game;Emulator;
           DESK
-            '
-          docker commit $(docker ps -lq) emu-builder-image
 
-      # =========================================================================
-      # PACKAGE ALL DEBS
-      # =========================================================================
-
-      - name: Package all .deb files
-        run: |
-          docker run --rm --platform linux/arm64 \
-            -v ${{ github.workspace }}:/workspace \
-            -e AZAHAR_VERSION=${{ steps.versions.outputs.azahar_version }} \
-            -e DOLPHIN_SHORT=${{ steps.versions.outputs.dolphin_short }} \
-            -e DUCK_SHORT=${{ steps.versions.outputs.duck_short }} \
-            -e ESDE_VERSION=${{ steps.versions.outputs.esde_version }} \
-            -e MELONDS_VERSION=${{ steps.versions.outputs.melonds_version }} \
-            -e PPSSPP_VERSION=${{ steps.versions.outputs.ppsspp_version }} \
-            -e XEMU_VERSION=${{ steps.versions.outputs.xemu_version }} \
-            emu-builder-image bash -c '
-              echo "=== Packaging .deb files for successful builds ==="
-
-              # Azahar
-              if [ -d /pkg/azahar/usr ]; then
-                AZAHAR_CLEAN=$(echo "$AZAHAR_VERSION" | sed "s/^v//")
-                mkdir -p /pkg/azahar/DEBIAN
-                cat > /pkg/azahar/DEBIAN/control << EOF
-          Package: azahar-emu-l4t
-          Version: ${AZAHAR_CLEAN}
-          Architecture: arm64
-          Maintainer: Ethiquema <noreply@ethiquema.github.io>
-          Depends: libc6, libjemalloc2, libqt6widgets6, libqt6gui6, libqt6core6, libqt6multimedia6, libqt6opengl6, libsdl2-2.0-0, libssl3t64, libavcodec60, libavformat60, libswscale7, libspeexdsp1, libfmt9, libzstd1, libusb-1.0-0, libhidapi-hidraw0, libboost-serialization1.83.0, libenet7, liblz4-1
-          Provides: citra
-          Replaces: citra
-          Section: games
-          Priority: optional
-          Description: Azahar 3DS Emulator (ARM64 L4T build)
-           Optimized for Nintendo Switch with Vulkan support.
-          EOF
-                dpkg-deb --build /pkg/azahar /workspace/azahar-emu-l4t_${AZAHAR_CLEAN}_arm64.deb
-                echo "✓ Azahar packaged"
-              else
-                echo "✗ Azahar build not found, skipping"
-              fi
-
-              # Dolphin
-              if [ -d /pkg/dolphin/usr ]; then
-                DOLPHIN_PKG="0.0.0+git.${DOLPHIN_SHORT}"
-                mkdir -p /pkg/dolphin/DEBIAN
-                cat > /pkg/dolphin/DEBIAN/control << EOF
-          Package: dolphin-emu-l4t
-          Version: ${DOLPHIN_PKG}
-          Architecture: arm64
-          Maintainer: Ethiquema <noreply@ethiquema.github.io>
-          Depends: libc6, libjemalloc2, libqt6widgets6, libqt6gui6, libqt6core6, libavcodec60, libavformat60, libswscale7, libevdev2, libminiupnpc17, libmbedtls21, libcurl4t64, libhidapi-hidraw0, libsystemd0, libbluetooth3, libasound2t64, libpulse0, libpugixml1v5, libbz2-1.0, libzstd1, liblzo2-2, libpng16-16t64, libusb-1.0-0, libfmt9, libsfml-system2.6, libsfml-network2.6, libxxhash0, libspng0
-          Section: games
-          Priority: optional
-          Description: Dolphin GameCube/Wii Emulator (ARM64 L4T build)
-           Optimized for Nintendo Switch with Vulkan/Wayland support.
-          EOF
-                dpkg-deb --build /pkg/dolphin /workspace/dolphin-emu-l4t_${DOLPHIN_PKG}_arm64.deb
-                echo "✓ Dolphin packaged"
-              else
-                echo "✗ Dolphin build not found, skipping"
-              fi
-
-              # DuckStation
-              if [ -d /pkg/duckstation/usr ]; then
-                DUCK_PKG="0.0.0+git.${DUCK_SHORT}"
-                mkdir -p /pkg/duckstation/DEBIAN
-                cat > /pkg/duckstation/DEBIAN/control << EOF
-          Package: duckstation-l4t
-          Version: ${DUCK_PKG}
-          Architecture: arm64
-          Maintainer: Ethiquema <noreply@ethiquema.github.io>
-          Depends: libc6, libjemalloc2, libqt6widgets6, libqt6gui6, libqt6core6, libsdl2-2.0-0, libcurl4t64
-          Section: games
-          Priority: optional
-          Description: DuckStation PS1 Emulator (ARM64 L4T build)
-           Optimized for Nintendo Switch with Vulkan support.
-          EOF
-                dpkg-deb --build /pkg/duckstation /workspace/duckstation-l4t_${DUCK_PKG}_arm64.deb
-                echo "✓ DuckStation packaged"
-              else
-                echo "✗ DuckStation build not found, skipping"
-              fi
-
-              # EmulationStation-DE
-              if [ -d /pkg/esde/usr ]; then
-                ESDE_CLEAN=$(echo "$ESDE_VERSION" | sed "s/^v//")
-                mkdir -p /pkg/esde/DEBIAN
-                cat > /pkg/esde/DEBIAN/control << EOF
-          Package: emulationstation-de-l4t
-          Version: ${ESDE_CLEAN}
-          Architecture: arm64
-          Maintainer: Ethiquema <noreply@ethiquema.github.io>
-          Depends: libc6, libsdl2-2.0-0, libavcodec60, libavformat60, libswscale7, libfreeimage3t64, libfreetype6, libcurl4t64, libpugixml1v5, libvlc5, libpoppler-cpp0t64
-          Provides: emulationstation
-          Conflicts: emulationstation
-          Section: games
-          Priority: optional
-          Description: EmulationStation Desktop Edition (ARM64 L4T build)
-           Optimized for Nintendo Switch.
-          EOF
-                dpkg-deb --build /pkg/esde /workspace/emulationstation-de-l4t_${ESDE_CLEAN}_arm64.deb
-                echo "✓ EmulationStation-DE packaged"
-              else
-                echo "✗ EmulationStation-DE build not found, skipping"
-              fi
-
-              # melonDS
-              if [ -d /pkg/melonds/usr ]; then
-                MELONDS_CLEAN=$(echo "$MELONDS_VERSION" | sed "s/^v//")
-                mkdir -p /pkg/melonds/DEBIAN
-                cat > /pkg/melonds/DEBIAN/control << EOF
-          Package: melonds-l4t
-          Version: ${MELONDS_CLEAN}
-          Architecture: arm64
-          Maintainer: Ethiquema <noreply@ethiquema.github.io>
-          Depends: libc6, libjemalloc2, libqt6widgets6, libqt6gui6, libqt6core6, libqt6multimedia6, libsdl2-2.0-0, libslirp0, libarchive13t64, libzstd1
-          Section: games
-          Priority: optional
-          Description: melonDS Nintendo DS Emulator (ARM64 L4T build)
-           Optimized for Nintendo Switch with OpenGL renderer.
-          EOF
-                dpkg-deb --build /pkg/melonds /workspace/melonds-l4t_${MELONDS_CLEAN}_arm64.deb
-                echo "✓ melonDS packaged"
-              else
-                echo "✗ melonDS build not found, skipping"
-              fi
-
-              # PPSSPP
-              if [ -d /pkg/ppsspp/usr ]; then
-                PPSSPP_CLEAN=$(echo "$PPSSPP_VERSION" | sed "s/^v//")
-                mkdir -p /pkg/ppsspp/DEBIAN
-                cat > /pkg/ppsspp/DEBIAN/control << EOF
-          Package: ppsspp-l4t
-          Version: ${PPSSPP_CLEAN}
-          Architecture: arm64
-          Maintainer: Ethiquema <noreply@ethiquema.github.io>
-          Depends: libc6, libjemalloc2, libsdl2-2.0-0, libsdl2-ttf-2.0-0, libglew2.2, libsnappy1v5, libavcodec60, libavformat60, libswscale7, libzip4t64, libpng16-16t64
-          Provides: ppsspp
-          Conflicts: ppsspp
-          Section: games
-          Priority: optional
-          Description: PPSSPP PlayStation Portable Emulator (ARM64 L4T build)
-           Optimized for Nintendo Switch with Vulkan support.
-          EOF
-                dpkg-deb --build /pkg/ppsspp /workspace/ppsspp-l4t_${PPSSPP_CLEAN}_arm64.deb
-                echo "✓ PPSSPP packaged"
-              else
-                echo "✗ PPSSPP build not found, skipping"
-              fi
-
-              # xemu
-              if [ -d /pkg/xemu/usr ]; then
-                XEMU_CLEAN=$(echo "$XEMU_VERSION" | sed "s/^v//")
-                mkdir -p /pkg/xemu/DEBIAN
-                cat > /pkg/xemu/DEBIAN/control << EOF
+              VERSION_CLEAN=$(echo "$VERSION" | sed "s/^v//")
+              mkdir -p /tmp/pkg/DEBIAN
+              cat > /tmp/pkg/DEBIAN/control << EOF
           Package: xemu-l4t
-          Version: ${XEMU_CLEAN}
+          Version: ${VERSION_CLEAN}
           Architecture: arm64
           Maintainer: Ethiquema <noreply@ethiquema.github.io>
           Depends: libc6, libjemalloc2, libsdl2-2.0-0, libepoxy0, libpixman-1-0, libgtk-3-0t64, libssl3t64, libsamplerate0, libpcap0.8t64, libslirp0
           Section: games
           Priority: optional
           Description: xemu Original Xbox Emulator (ARM64 L4T build)
-           Optimized for Nintendo Switch with Vulkan support.
           EOF
-                dpkg-deb --build /pkg/xemu /workspace/xemu-l4t_${XEMU_CLEAN}_arm64.deb
-                echo "✓ xemu packaged"
-              else
-                echo "✗ xemu build not found, skipping"
-              fi
-
-              echo "=== Packaging complete ==="
-              ls -la /workspace/*.deb 2>/dev/null || echo "No packages were built"
+              dpkg-deb --build /tmp/pkg /workspace/xemu-l4t_${VERSION_CLEAN}_arm64.deb
             '
 
-      - name: Upload artifacts
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: emulator-debs
+          name: deb-xemu
           path: "*.deb"
           retention-days: 1
 
-      - name: Save version trackers
-        run: |
-          echo "${{ steps.versions.outputs.azahar_version }}" > .azahar-version
-          echo "${{ steps.versions.outputs.dolphin_commit }}" > .dolphin-commit
-          echo "${{ steps.versions.outputs.duck_commit }}" > .duckstation-commit
-          echo "${{ steps.versions.outputs.esde_version }}" > .esde-version
-          echo "${{ steps.versions.outputs.melonds_version }}" > .melonds-version
-          echo "${{ steps.versions.outputs.ppsspp_version }}" > .ppsspp-version
-          echo "${{ steps.versions.outputs.xemu_version }}" > .xemu-version
-
+  # ===========================================================================
+  # UPDATE REPO: Collect all debs and update APT repository
+  # ===========================================================================
   update-repo:
-    needs: build
+    needs: [prepare, build-azahar, build-dolphin, build-duckstation, build-esde, build-melonds, build-ppsspp, build-xemu]
+    if: always()
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout main
@@ -540,12 +683,25 @@ jobs:
         with:
           ref: main
 
-      - name: Download artifacts
+      - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
-          name: emulator-debs
+          pattern: deb-*
+          merge-multiple: true
+
+      - name: Check for packages
+        id: check
+        run: |
+          if ls *.deb 1> /dev/null 2>&1; then
+            echo "has_debs=true" >> $GITHUB_OUTPUT
+            ls -la *.deb
+          else
+            echo "has_debs=false" >> $GITHUB_OUTPUT
+            echo "No packages to publish"
+          fi
 
       - name: Checkout gh-pages
+        if: steps.check.outputs.has_debs == 'true'
         run: |
           git fetch origin gh-pages:gh-pages || true
           git worktree add gh-pages-dir gh-pages || {
@@ -558,19 +714,23 @@ jobs:
           }
 
       - name: Install APT tools
+        if: steps.check.outputs.has_debs == 'true'
         run: sudo apt-get update && sudo apt-get install -y dpkg-dev apt-utils
 
       - name: Import GPG key
+        if: steps.check.outputs.has_debs == 'true'
         run: |
           echo "${{ secrets.PRIVATE }}" | gpg --batch --import
           gpg --armor --export "Ethiquema L4T Repo" > gh-pages-dir/public.key
 
       - name: Add packages to pool
+        if: steps.check.outputs.has_debs == 'true'
         run: |
           mkdir -p gh-pages-dir/pool/main
-          cp *.deb gh-pages-dir/pool/main/ 2>/dev/null || echo "No new packages"
+          cp *.deb gh-pages-dir/pool/main/
 
       - name: Regenerate APT repository metadata
+        if: steps.check.outputs.has_debs == 'true'
         run: |
           cd gh-pages-dir
           mkdir -p dists/noble/main/binary-arm64
@@ -595,6 +755,7 @@ jobs:
           gpg --batch --default-key "Ethiquema L4T Repo" --clearsign -o InRelease Release
 
       - name: Deploy to gh-pages
+        if: steps.check.outputs.has_debs == 'true'
         run: |
           cd gh-pages-dir
           git config user.name "github-actions[bot]"
@@ -603,8 +764,17 @@ jobs:
           git commit -m "Update APT repository" || echo "No changes"
           git push origin gh-pages
 
-      - name: Save trackers to main
+      - name: Save version trackers
+        if: steps.check.outputs.has_debs == 'true'
         run: |
+          echo "${{ needs.prepare.outputs.azahar_version }}" > .azahar-version
+          echo "${{ needs.prepare.outputs.dolphin_commit }}" > .dolphin-commit
+          echo "${{ needs.prepare.outputs.duck_commit }}" > .duckstation-commit
+          echo "${{ needs.prepare.outputs.esde_version }}" > .esde-version
+          echo "${{ needs.prepare.outputs.melonds_version }}" > .melonds-version
+          echo "${{ needs.prepare.outputs.ppsspp_version }}" > .ppsspp-version
+          echo "${{ needs.prepare.outputs.xemu_version }}" > .xemu-version
+
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add .*-version .*-commit 2>/dev/null || true
