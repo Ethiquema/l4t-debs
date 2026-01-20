@@ -3205,6 +3205,22 @@ Description: Qt 6 extra widget styles - GTK+ 2 Platform theme
  This package contains the GTK+ 2 style and platform theme. Export
  QT_QPA_PLATFORMTHEME=gtk2 to enable it for all Qt applications.
 
+Package: setperf
+Version: 1.0.0
+Architecture: arm64
+Maintainer: Ethiquema <noreply@ethiquema.github.io>
+Depends: bash
+Filename: pool/main/setperf_1.0.0_arm64.deb
+Size: 4124
+MD5sum: a9ea710956b7ba4f43a315d27e3093bc
+SHA1: bb3bf08344da6e133dfb884625dd7d6243939490
+SHA256: a511fccf3b730c833437368b66be13e611fbdd015a33e016295d31033f91fc07
+Section: utils
+Priority: optional
+Description: Nintendo Switch performance tuning wrapper
+ Applies performance settings before launching games and restores them after.
+ Designed for L4T Linux on Nintendo Switch.
+
 Package: smplayer
 Version: 23.6.0-1~jammy1
 Architecture: arm64
