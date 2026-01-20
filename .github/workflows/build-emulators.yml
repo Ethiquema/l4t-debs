@@ -10,9 +10,11 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 env:
-  CACHE_KEY: emu-deps-v2
+  CACHE_KEY: emu-deps-v3
+  BUILD_TIMEOUT: 19800  # 5h30 in seconds (leave 30min for cache save)
 
 jobs:
   # ===========================================================================
@@ -157,6 +159,7 @@ jobs:
               apt-get install -y \
                 build-essential cmake ninja-build git pkg-config meson dpkg-dev \
                 clang llvm libc++-dev libc++abi-dev \
+                ccache \
                 python3 python3-pip python3-yaml \
                 libjemalloc-dev libwayland-dev \
                 qt6-base-dev qt6-base-private-dev qt6-multimedia-dev qt6-tools-dev \
@@ -188,13 +191,15 @@ jobs:
           docker rm emu-deps
 
   # ===========================================================================
-  # BUILD JOBS (parallel)
+  # BUILD JOBS (with ccache and timeout handling)
   # ===========================================================================
 
   build-azahar:
     needs: prepare
     if: needs.prepare.outputs.build_azahar == 'true'
     runs-on: ubuntu-24.04
+    outputs:
+      completed: ${{ steps.build.outputs.completed }}
     steps:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -210,35 +215,82 @@ jobs:
       - name: Load image
         run: docker load -i /tmp/emu-deps.tar
 
+      - name: Restore ccache
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/ccache-azahar
+          key: ccache-azahar-${{ needs.prepare.outputs.azahar_version }}
+          restore-keys: |
+            ccache-azahar-
+
       - name: Build Azahar
+        id: build
         run: |
+          mkdir -p /tmp/ccache-azahar
+
+          # Start timer
+          START_TIME=$(date +%s)
+
           docker run --rm --platform linux/arm64 \
             -v ${{ github.workspace }}:/workspace \
+            -v /tmp/ccache-azahar:/ccache \
             -e VERSION=${{ needs.prepare.outputs.azahar_version }} \
+            -e CCACHE_DIR=/ccache \
+            -e BUILD_TIMEOUT=${{ env.BUILD_TIMEOUT }} \
+            -e START_TIME=$START_TIME \
             emu-deps-image bash -c '
               set -e
-              git clone --depth 1 --branch "$VERSION" --recurse-submodules \
-                https://github.com/azahar-emu/azahar.git /src
-              cd /src && mkdir build && cd build
-              cmake .. -G Ninja \
-                -DCMAKE_BUILD_TYPE=Release \
-                -DCMAKE_INSTALL_PREFIX=/usr \
-                -DCMAKE_CXX_COMPILER=clang++ \
-                -DCMAKE_C_COMPILER=clang \
-                -DCMAKE_C_FLAGS="-O3 -flto=thin -march=armv8-a+crc+simd -mtune=cortex-a57" \
-                -DCMAKE_CXX_FLAGS="-O3 -flto=thin -march=armv8-a+crc+simd -mtune=cortex-a57" \
-                -DCMAKE_EXE_LINKER_FLAGS="-ljemalloc" \
-                -DCMAKE_SHARED_LINKER_FLAGS="-ljemalloc" \
-                -DENABLE_VULKAN=ON \
-                -DENABLE_OPENGL=ON \
-                -DENABLE_QT_GUI=ON \
-                -DENABLE_SDL2_FRONTEND=ON \
-                -DENABLE_TESTS=OFF \
-                -DENABLE_WEB_SERVICE=OFF \
-                -DENABLE_X11=OFF
-              ninja -j$(nproc)
-              DESTDIR=/tmp/pkg ninja install
 
+              # Setup ccache
+              export PATH="/usr/lib/ccache:$PATH"
+              export CCACHE_MAXSIZE=5G
+              ccache -z
+
+              # Clone source
+              if [[ ! -d /workspace/src-azahar ]]; then
+                git clone --depth 1 --branch "$VERSION" --recurse-submodules \
+                  https://github.com/azahar-emu/azahar.git /workspace/src-azahar
+              fi
+
+              cd /workspace/src-azahar
+              mkdir -p build && cd build
+
+              # Configure if needed
+              if [[ ! -f build.ninja ]]; then
+                cmake .. -G Ninja \
+                  -DCMAKE_BUILD_TYPE=Release \
+                  -DCMAKE_INSTALL_PREFIX=/usr \
+                  -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+                  -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+                  -DCMAKE_CXX_COMPILER=clang++ \
+                  -DCMAKE_C_COMPILER=clang \
+                  -DCMAKE_C_FLAGS="-O3 -flto=thin -march=armv8-a+crc+simd -mtune=cortex-a57" \
+                  -DCMAKE_CXX_FLAGS="-O3 -flto=thin -march=armv8-a+crc+simd -mtune=cortex-a57" \
+                  -DCMAKE_EXE_LINKER_FLAGS="-ljemalloc" \
+                  -DCMAKE_SHARED_LINKER_FLAGS="-ljemalloc" \
+                  -DENABLE_VULKAN=ON \
+                  -DENABLE_OPENGL=ON \
+                  -DENABLE_QT_GUI=ON \
+                  -DENABLE_SDL2_FRONTEND=ON \
+                  -DENABLE_TESTS=OFF \
+                  -DENABLE_WEB_SERVICE=OFF \
+                  -DENABLE_X11=OFF
+              fi
+
+              # Build with timeout check
+              timeout ${BUILD_TIMEOUT}s ninja -j$(nproc) || {
+                EXIT_CODE=$?
+                ccache -s
+                if [[ $EXIT_CODE -eq 124 ]]; then
+                  echo "TIMEOUT - will retry with cache"
+                  echo "timeout" > /workspace/build-status
+                  exit 0
+                fi
+                exit $EXIT_CODE
+              }
+
+              # Package
+              DESTDIR=/tmp/pkg ninja install
               VERSION_CLEAN=$(echo "$VERSION" | sed "s/^v//")
               mkdir -p /tmp/pkg/DEBIAN
               cat > /tmp/pkg/DEBIAN/control << EOF
@@ -254,19 +306,52 @@ jobs:
           Description: Azahar 3DS Emulator (ARM64 L4T build)
           EOF
               dpkg-deb --build /tmp/pkg /workspace/azahar-emu-l4t_${VERSION_CLEAN}_arm64.deb
+
+              ccache -s
+              echo "completed" > /workspace/build-status
             '
 
+          # Check result
+          if [[ -f build-status ]] && [[ "$(cat build-status)" == "completed" ]]; then
+            echo "completed=true" >> $GITHUB_OUTPUT
+          else
+            echo "completed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Save ccache
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: /tmp/ccache-azahar
+          key: ccache-azahar-${{ needs.prepare.outputs.azahar_version }}-${{ github.run_id }}
+
       - name: Upload artifact
+        if: steps.build.outputs.completed == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: deb-azahar
           path: "*.deb"
           retention-days: 1
 
+      - name: Trigger retry if timeout
+        if: steps.build.outputs.completed == 'false'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'build-emulators.yml',
+              ref: 'main'
+            });
+            console.log('Triggered retry workflow');
+
   build-dolphin:
     needs: prepare
     if: needs.prepare.outputs.build_dolphin == 'true'
     runs-on: ubuntu-24.04
+    outputs:
+      completed: ${{ steps.build.outputs.completed }}
     steps:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -282,32 +367,69 @@ jobs:
       - name: Load image
         run: docker load -i /tmp/emu-deps.tar
 
+      - name: Restore ccache
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/ccache-dolphin
+          key: ccache-dolphin-${{ needs.prepare.outputs.dolphin_short }}
+          restore-keys: |
+            ccache-dolphin-
+
       - name: Build Dolphin
+        id: build
         run: |
+          mkdir -p /tmp/ccache-dolphin
+
           docker run --rm --platform linux/arm64 \
             -v ${{ github.workspace }}:/workspace \
+            -v /tmp/ccache-dolphin:/ccache \
             -e COMMIT=${{ needs.prepare.outputs.dolphin_commit }} \
             -e SHORT=${{ needs.prepare.outputs.dolphin_short }} \
+            -e CCACHE_DIR=/ccache \
+            -e BUILD_TIMEOUT=${{ env.BUILD_TIMEOUT }} \
             emu-deps-image bash -c '
               set -e
-              git clone https://github.com/dolphin-emu/dolphin.git /src
-              cd /src && git checkout "$COMMIT" && git submodule update --init --recursive
-              mkdir build && cd build
-              cmake .. -G Ninja \
-                -DCMAKE_BUILD_TYPE=Release \
-                -DCMAKE_INSTALL_PREFIX=/usr \
-                -DCMAKE_C_FLAGS="-O3 -flto -march=armv8-a+crc+simd -mtune=cortex-a57" \
-                -DCMAKE_CXX_FLAGS="-O3 -flto -march=armv8-a+crc+simd -mtune=cortex-a57" \
-                -DCMAKE_EXE_LINKER_FLAGS="-ljemalloc" \
-                -DCMAKE_SHARED_LINKER_FLAGS="-ljemalloc" \
-                -DENABLE_VULKAN=ON \
-                -DENABLE_X11=OFF \
-                -DENABLE_WAYLAND=ON \
-                -DENABLE_TESTS=OFF \
-                -DENABLE_ANALYTICS=OFF
-              ninja -j$(nproc)
-              DESTDIR=/tmp/pkg ninja install
 
+              export PATH="/usr/lib/ccache:$PATH"
+              export CCACHE_MAXSIZE=5G
+              ccache -z
+
+              if [[ ! -d /workspace/src-dolphin ]]; then
+                git clone https://github.com/dolphin-emu/dolphin.git /workspace/src-dolphin
+                cd /workspace/src-dolphin && git checkout "$COMMIT" && git submodule update --init --recursive
+              fi
+
+              cd /workspace/src-dolphin
+              mkdir -p build && cd build
+
+              if [[ ! -f build.ninja ]]; then
+                cmake .. -G Ninja \
+                  -DCMAKE_BUILD_TYPE=Release \
+                  -DCMAKE_INSTALL_PREFIX=/usr \
+                  -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+                  -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+                  -DCMAKE_C_FLAGS="-O3 -flto -march=armv8-a+crc+simd -mtune=cortex-a57" \
+                  -DCMAKE_CXX_FLAGS="-O3 -flto -march=armv8-a+crc+simd -mtune=cortex-a57" \
+                  -DCMAKE_EXE_LINKER_FLAGS="-ljemalloc" \
+                  -DCMAKE_SHARED_LINKER_FLAGS="-ljemalloc" \
+                  -DENABLE_VULKAN=ON \
+                  -DENABLE_X11=OFF \
+                  -DENABLE_WAYLAND=ON \
+                  -DENABLE_TESTS=OFF \
+                  -DENABLE_ANALYTICS=OFF
+              fi
+
+              timeout ${BUILD_TIMEOUT}s ninja -j$(nproc) || {
+                EXIT_CODE=$?
+                ccache -s
+                if [[ $EXIT_CODE -eq 124 ]]; then
+                  echo "timeout" > /workspace/build-status
+                  exit 0
+                fi
+                exit $EXIT_CODE
+              }
+
+              DESTDIR=/tmp/pkg ninja install
               PKG_VERSION="0.0.0+git.${SHORT}"
               mkdir -p /tmp/pkg/DEBIAN
               cat > /tmp/pkg/DEBIAN/control << EOF
@@ -321,19 +443,50 @@ jobs:
           Description: Dolphin GameCube/Wii Emulator (ARM64 L4T build)
           EOF
               dpkg-deb --build /tmp/pkg /workspace/dolphin-emu-l4t_${PKG_VERSION}_arm64.deb
+
+              ccache -s
+              echo "completed" > /workspace/build-status
             '
 
+          if [[ -f build-status ]] && [[ "$(cat build-status)" == "completed" ]]; then
+            echo "completed=true" >> $GITHUB_OUTPUT
+          else
+            echo "completed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Save ccache
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: /tmp/ccache-dolphin
+          key: ccache-dolphin-${{ needs.prepare.outputs.dolphin_short }}-${{ github.run_id }}
+
       - name: Upload artifact
+        if: steps.build.outputs.completed == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: deb-dolphin
           path: "*.deb"
           retention-days: 1
 
+      - name: Trigger retry if timeout
+        if: steps.build.outputs.completed == 'false'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'build-emulators.yml',
+              ref: 'main'
+            });
+
   build-duckstation:
     needs: prepare
     if: needs.prepare.outputs.build_duckstation == 'true'
     runs-on: ubuntu-24.04
+    outputs:
+      completed: ${{ steps.build.outputs.completed }}
     steps:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -349,35 +502,69 @@ jobs:
       - name: Load image
         run: docker load -i /tmp/emu-deps.tar
 
+      - name: Restore ccache
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/ccache-duck
+          key: ccache-duck-${{ needs.prepare.outputs.duck_short }}
+          restore-keys: |
+            ccache-duck-
+
       - name: Build DuckStation
+        id: build
         run: |
+          mkdir -p /tmp/ccache-duck
+
           docker run --rm --platform linux/arm64 \
             -v ${{ github.workspace }}:/workspace \
+            -v /tmp/ccache-duck:/ccache \
             -e COMMIT=${{ needs.prepare.outputs.duck_commit }} \
             -e SHORT=${{ needs.prepare.outputs.duck_short }} \
+            -e CCACHE_DIR=/ccache \
+            -e BUILD_TIMEOUT=${{ env.BUILD_TIMEOUT }} \
             emu-deps-image bash -c '
               set -e
-              git clone https://github.com/stenzek/duckstation.git /src
-              cd /src && git checkout "$COMMIT" && git submodule update --init --recursive
 
-              # Patch PNG version requirement (Ubuntu 24.04 has 1.6.43, duck wants 1.6.53)
-              sed -i "s/PNG 1.6.53/PNG 1.6.40/" CMakeModules/DuckStationDependencies.cmake || true
+              export PATH="/usr/lib/ccache:$PATH"
+              export CCACHE_MAXSIZE=5G
+              ccache -z
 
-              mkdir build && cd build
-              cmake .. -G Ninja \
-                -DCMAKE_BUILD_TYPE=Release \
-                -DCMAKE_INSTALL_PREFIX=/usr \
-                -DCMAKE_C_FLAGS="-O3 -flto -march=armv8-a+crc+simd -mtune=cortex-a57" \
-                -DCMAKE_CXX_FLAGS="-O3 -flto -march=armv8-a+crc+simd -mtune=cortex-a57" \
-                -DCMAKE_EXE_LINKER_FLAGS="-ljemalloc" \
-                -DCMAKE_SHARED_LINKER_FLAGS="-ljemalloc" \
-                -DBUILD_QT_FRONTEND=ON \
-                -DBUILD_NOGUI_FRONTEND=OFF \
-                -DENABLE_WAYLAND=ON \
-                -DENABLE_X11=OFF
-              ninja -j$(nproc)
+              if [[ ! -d /workspace/src-duck ]]; then
+                git clone https://github.com/stenzek/duckstation.git /workspace/src-duck
+                cd /workspace/src-duck && git checkout "$COMMIT" && git submodule update --init --recursive
+                sed -i "s/PNG 1.6.53/PNG 1.6.40/" CMakeModules/DuckStationDependencies.cmake || true
+              fi
+
+              cd /workspace/src-duck
+              mkdir -p build && cd build
+
+              if [[ ! -f build.ninja ]]; then
+                cmake .. -G Ninja \
+                  -DCMAKE_BUILD_TYPE=Release \
+                  -DCMAKE_INSTALL_PREFIX=/usr \
+                  -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+                  -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+                  -DCMAKE_C_FLAGS="-O3 -flto -march=armv8-a+crc+simd -mtune=cortex-a57" \
+                  -DCMAKE_CXX_FLAGS="-O3 -flto -march=armv8-a+crc+simd -mtune=cortex-a57" \
+                  -DCMAKE_EXE_LINKER_FLAGS="-ljemalloc" \
+                  -DCMAKE_SHARED_LINKER_FLAGS="-ljemalloc" \
+                  -DBUILD_QT_FRONTEND=ON \
+                  -DBUILD_NOGUI_FRONTEND=OFF \
+                  -DENABLE_WAYLAND=ON \
+                  -DENABLE_X11=OFF
+              fi
+
+              timeout ${BUILD_TIMEOUT}s ninja -j$(nproc) || {
+                EXIT_CODE=$?
+                ccache -s
+                if [[ $EXIT_CODE -eq 124 ]]; then
+                  echo "timeout" > /workspace/build-status
+                  exit 0
+                fi
+                exit $EXIT_CODE
+              }
+
               DESTDIR=/tmp/pkg ninja install
-
               PKG_VERSION="0.0.0+git.${SHORT}"
               mkdir -p /tmp/pkg/DEBIAN
               cat > /tmp/pkg/DEBIAN/control << EOF
@@ -391,19 +578,50 @@ jobs:
           Description: DuckStation PS1 Emulator (ARM64 L4T build)
           EOF
               dpkg-deb --build /tmp/pkg /workspace/duckstation-l4t_${PKG_VERSION}_arm64.deb
+
+              ccache -s
+              echo "completed" > /workspace/build-status
             '
 
+          if [[ -f build-status ]] && [[ "$(cat build-status)" == "completed" ]]; then
+            echo "completed=true" >> $GITHUB_OUTPUT
+          else
+            echo "completed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Save ccache
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: /tmp/ccache-duck
+          key: ccache-duck-${{ needs.prepare.outputs.duck_short }}-${{ github.run_id }}
+
       - name: Upload artifact
+        if: steps.build.outputs.completed == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: deb-duckstation
           path: "*.deb"
           retention-days: 1
 
+      - name: Trigger retry if timeout
+        if: steps.build.outputs.completed == 'false'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'build-emulators.yml',
+              ref: 'main'
+            });
+
   build-esde:
     needs: prepare
     if: needs.prepare.outputs.build_esde == 'true'
     runs-on: ubuntu-24.04
+    outputs:
+      completed: ${{ steps.build.outputs.completed }}
     steps:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -419,24 +637,61 @@ jobs:
       - name: Load image
         run: docker load -i /tmp/emu-deps.tar
 
+      - name: Restore ccache
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/ccache-esde
+          key: ccache-esde-${{ needs.prepare.outputs.esde_version }}
+          restore-keys: |
+            ccache-esde-
+
       - name: Build EmulationStation-DE
+        id: build
         run: |
+          mkdir -p /tmp/ccache-esde
+
           docker run --rm --platform linux/arm64 \
             -v ${{ github.workspace }}:/workspace \
+            -v /tmp/ccache-esde:/ccache \
             -e VERSION=${{ needs.prepare.outputs.esde_version }} \
+            -e CCACHE_DIR=/ccache \
+            -e BUILD_TIMEOUT=${{ env.BUILD_TIMEOUT }} \
             emu-deps-image bash -c '
               set -e
-              git clone --depth 1 --branch "$VERSION" \
-                https://gitlab.com/es-de/emulationstation-de.git /src
-              cd /src && mkdir build && cd build
-              cmake .. -G Ninja \
-                -DCMAKE_BUILD_TYPE=Release \
-                -DCMAKE_INSTALL_PREFIX=/usr \
-                -DCMAKE_C_FLAGS="-O3 -flto -march=armv8-a+crc+simd -mtune=cortex-a57" \
-                -DCMAKE_CXX_FLAGS="-O3 -flto -march=armv8-a+crc+simd -mtune=cortex-a57"
-              ninja -j$(nproc)
-              DESTDIR=/tmp/pkg ninja install
 
+              export PATH="/usr/lib/ccache:$PATH"
+              export CCACHE_MAXSIZE=5G
+              ccache -z
+
+              if [[ ! -d /workspace/src-esde ]]; then
+                git clone --depth 1 --branch "$VERSION" \
+                  https://gitlab.com/es-de/emulationstation-de.git /workspace/src-esde
+              fi
+
+              cd /workspace/src-esde
+              mkdir -p build && cd build
+
+              if [[ ! -f build.ninja ]]; then
+                cmake .. -G Ninja \
+                  -DCMAKE_BUILD_TYPE=Release \
+                  -DCMAKE_INSTALL_PREFIX=/usr \
+                  -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+                  -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+                  -DCMAKE_C_FLAGS="-O3 -flto -march=armv8-a+crc+simd -mtune=cortex-a57" \
+                  -DCMAKE_CXX_FLAGS="-O3 -flto -march=armv8-a+crc+simd -mtune=cortex-a57"
+              fi
+
+              timeout ${BUILD_TIMEOUT}s ninja -j$(nproc) || {
+                EXIT_CODE=$?
+                ccache -s
+                if [[ $EXIT_CODE -eq 124 ]]; then
+                  echo "timeout" > /workspace/build-status
+                  exit 0
+                fi
+                exit $EXIT_CODE
+              }
+
+              DESTDIR=/tmp/pkg ninja install
               VERSION_CLEAN=$(echo "$VERSION" | sed "s/^v//")
               mkdir -p /tmp/pkg/DEBIAN
               cat > /tmp/pkg/DEBIAN/control << EOF
@@ -452,19 +707,50 @@ jobs:
           Description: EmulationStation Desktop Edition (ARM64 L4T build)
           EOF
               dpkg-deb --build /tmp/pkg /workspace/emulationstation-de-l4t_${VERSION_CLEAN}_arm64.deb
+
+              ccache -s
+              echo "completed" > /workspace/build-status
             '
 
+          if [[ -f build-status ]] && [[ "$(cat build-status)" == "completed" ]]; then
+            echo "completed=true" >> $GITHUB_OUTPUT
+          else
+            echo "completed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Save ccache
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: /tmp/ccache-esde
+          key: ccache-esde-${{ needs.prepare.outputs.esde_version }}-${{ github.run_id }}
+
       - name: Upload artifact
+        if: steps.build.outputs.completed == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: deb-esde
           path: "*.deb"
           retention-days: 1
 
+      - name: Trigger retry if timeout
+        if: steps.build.outputs.completed == 'false'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'build-emulators.yml',
+              ref: 'main'
+            });
+
   build-melonds:
     needs: prepare
     if: needs.prepare.outputs.build_melonds == 'true'
     runs-on: ubuntu-24.04
+    outputs:
+      completed: ${{ steps.build.outputs.completed }}
     steps:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -480,27 +766,64 @@ jobs:
       - name: Load image
         run: docker load -i /tmp/emu-deps.tar
 
+      - name: Restore ccache
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/ccache-melonds
+          key: ccache-melonds-${{ needs.prepare.outputs.melonds_version }}
+          restore-keys: |
+            ccache-melonds-
+
       - name: Build melonDS
+        id: build
         run: |
+          mkdir -p /tmp/ccache-melonds
+
           docker run --rm --platform linux/arm64 \
             -v ${{ github.workspace }}:/workspace \
+            -v /tmp/ccache-melonds:/ccache \
             -e VERSION=${{ needs.prepare.outputs.melonds_version }} \
+            -e CCACHE_DIR=/ccache \
+            -e BUILD_TIMEOUT=${{ env.BUILD_TIMEOUT }} \
             emu-deps-image bash -c '
               set -e
-              git clone --depth 1 --branch "$VERSION" \
-                https://github.com/melonDS-emu/melonDS.git /src
-              cd /src && mkdir build && cd build
-              cmake .. -G Ninja \
-                -DCMAKE_BUILD_TYPE=Release \
-                -DCMAKE_INSTALL_PREFIX=/usr \
-                -DCMAKE_C_FLAGS="-O3 -flto -march=armv8-a+crc+simd -mtune=cortex-a57" \
-                -DCMAKE_CXX_FLAGS="-O3 -flto -march=armv8-a+crc+simd -mtune=cortex-a57" \
-                -DCMAKE_EXE_LINKER_FLAGS="-ljemalloc" \
-                -DCMAKE_SHARED_LINKER_FLAGS="-ljemalloc" \
-                -DENABLE_WAYLAND=ON
-              ninja -j$(nproc)
-              DESTDIR=/tmp/pkg ninja install
 
+              export PATH="/usr/lib/ccache:$PATH"
+              export CCACHE_MAXSIZE=5G
+              ccache -z
+
+              if [[ ! -d /workspace/src-melonds ]]; then
+                git clone --depth 1 --branch "$VERSION" \
+                  https://github.com/melonDS-emu/melonDS.git /workspace/src-melonds
+              fi
+
+              cd /workspace/src-melonds
+              mkdir -p build && cd build
+
+              if [[ ! -f build.ninja ]]; then
+                cmake .. -G Ninja \
+                  -DCMAKE_BUILD_TYPE=Release \
+                  -DCMAKE_INSTALL_PREFIX=/usr \
+                  -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+                  -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+                  -DCMAKE_C_FLAGS="-O3 -flto -march=armv8-a+crc+simd -mtune=cortex-a57" \
+                  -DCMAKE_CXX_FLAGS="-O3 -flto -march=armv8-a+crc+simd -mtune=cortex-a57" \
+                  -DCMAKE_EXE_LINKER_FLAGS="-ljemalloc" \
+                  -DCMAKE_SHARED_LINKER_FLAGS="-ljemalloc" \
+                  -DENABLE_WAYLAND=ON
+              fi
+
+              timeout ${BUILD_TIMEOUT}s ninja -j$(nproc) || {
+                EXIT_CODE=$?
+                ccache -s
+                if [[ $EXIT_CODE -eq 124 ]]; then
+                  echo "timeout" > /workspace/build-status
+                  exit 0
+                fi
+                exit $EXIT_CODE
+              }
+
+              DESTDIR=/tmp/pkg ninja install
               VERSION_CLEAN=$(echo "$VERSION" | sed "s/^v//")
               mkdir -p /tmp/pkg/DEBIAN
               cat > /tmp/pkg/DEBIAN/control << EOF
@@ -514,19 +837,50 @@ jobs:
           Description: melonDS Nintendo DS Emulator (ARM64 L4T build)
           EOF
               dpkg-deb --build /tmp/pkg /workspace/melonds-l4t_${VERSION_CLEAN}_arm64.deb
+
+              ccache -s
+              echo "completed" > /workspace/build-status
             '
 
+          if [[ -f build-status ]] && [[ "$(cat build-status)" == "completed" ]]; then
+            echo "completed=true" >> $GITHUB_OUTPUT
+          else
+            echo "completed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Save ccache
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: /tmp/ccache-melonds
+          key: ccache-melonds-${{ needs.prepare.outputs.melonds_version }}-${{ github.run_id }}
+
       - name: Upload artifact
+        if: steps.build.outputs.completed == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: deb-melonds
           path: "*.deb"
           retention-days: 1
 
+      - name: Trigger retry if timeout
+        if: steps.build.outputs.completed == 'false'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'build-emulators.yml',
+              ref: 'main'
+            });
+
   build-ppsspp:
     needs: prepare
     if: needs.prepare.outputs.build_ppsspp == 'true'
     runs-on: ubuntu-24.04
+    outputs:
+      completed: ${{ steps.build.outputs.completed }}
     steps:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -542,28 +896,65 @@ jobs:
       - name: Load image
         run: docker load -i /tmp/emu-deps.tar
 
+      - name: Restore ccache
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/ccache-ppsspp
+          key: ccache-ppsspp-${{ needs.prepare.outputs.ppsspp_version }}
+          restore-keys: |
+            ccache-ppsspp-
+
       - name: Build PPSSPP
+        id: build
         run: |
+          mkdir -p /tmp/ccache-ppsspp
+
           docker run --rm --platform linux/arm64 \
             -v ${{ github.workspace }}:/workspace \
+            -v /tmp/ccache-ppsspp:/ccache \
             -e VERSION=${{ needs.prepare.outputs.ppsspp_version }} \
+            -e CCACHE_DIR=/ccache \
+            -e BUILD_TIMEOUT=${{ env.BUILD_TIMEOUT }} \
             emu-deps-image bash -c '
               set -e
-              git clone --depth 1 --branch "$VERSION" --recurse-submodules \
-                https://github.com/hrydgard/ppsspp.git /src
-              cd /src && mkdir build && cd build
-              cmake .. -G Ninja \
-                -DCMAKE_BUILD_TYPE=Release \
-                -DCMAKE_INSTALL_PREFIX=/usr \
-                -DCMAKE_C_FLAGS="-O3 -flto -march=armv8-a+crc+simd -mtune=cortex-a57" \
-                -DCMAKE_CXX_FLAGS="-O3 -flto -march=armv8-a+crc+simd -mtune=cortex-a57" \
-                -DCMAKE_EXE_LINKER_FLAGS="-ljemalloc" \
-                -DCMAKE_SHARED_LINKER_FLAGS="-ljemalloc" \
-                -DUSING_QT_UI=OFF \
-                -DHEADLESS=OFF \
-                -DUSE_WAYLAND_WSI=ON \
-                -DVULKAN=ON
-              ninja -j$(nproc)
+
+              export PATH="/usr/lib/ccache:$PATH"
+              export CCACHE_MAXSIZE=5G
+              ccache -z
+
+              if [[ ! -d /workspace/src-ppsspp ]]; then
+                git clone --depth 1 --branch "$VERSION" --recurse-submodules \
+                  https://github.com/hrydgard/ppsspp.git /workspace/src-ppsspp
+              fi
+
+              cd /workspace/src-ppsspp
+              mkdir -p build && cd build
+
+              if [[ ! -f build.ninja ]]; then
+                cmake .. -G Ninja \
+                  -DCMAKE_BUILD_TYPE=Release \
+                  -DCMAKE_INSTALL_PREFIX=/usr \
+                  -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+                  -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+                  -DCMAKE_C_FLAGS="-O3 -flto -march=armv8-a+crc+simd -mtune=cortex-a57" \
+                  -DCMAKE_CXX_FLAGS="-O3 -flto -march=armv8-a+crc+simd -mtune=cortex-a57" \
+                  -DCMAKE_EXE_LINKER_FLAGS="-ljemalloc" \
+                  -DCMAKE_SHARED_LINKER_FLAGS="-ljemalloc" \
+                  -DUSING_QT_UI=OFF \
+                  -DHEADLESS=OFF \
+                  -DUSE_WAYLAND_WSI=ON \
+                  -DVULKAN=ON
+              fi
+
+              timeout ${BUILD_TIMEOUT}s ninja -j$(nproc) || {
+                EXIT_CODE=$?
+                ccache -s
+                if [[ $EXIT_CODE -eq 124 ]]; then
+                  echo "timeout" > /workspace/build-status
+                  exit 0
+                fi
+                exit $EXIT_CODE
+              }
 
               mkdir -p /tmp/pkg/usr/bin /tmp/pkg/usr/share/applications /tmp/pkg/usr/share/ppsspp
               cp PPSSPPSDL /tmp/pkg/usr/bin/ppsspp
@@ -595,19 +986,50 @@ jobs:
           Description: PPSSPP PlayStation Portable Emulator (ARM64 L4T build)
           EOF
               dpkg-deb --build /tmp/pkg /workspace/ppsspp-l4t_${VERSION_CLEAN}_arm64.deb
+
+              ccache -s
+              echo "completed" > /workspace/build-status
             '
 
+          if [[ -f build-status ]] && [[ "$(cat build-status)" == "completed" ]]; then
+            echo "completed=true" >> $GITHUB_OUTPUT
+          else
+            echo "completed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Save ccache
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: /tmp/ccache-ppsspp
+          key: ccache-ppsspp-${{ needs.prepare.outputs.ppsspp_version }}-${{ github.run_id }}
+
       - name: Upload artifact
+        if: steps.build.outputs.completed == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: deb-ppsspp
           path: "*.deb"
           retention-days: 1
 
+      - name: Trigger retry if timeout
+        if: steps.build.outputs.completed == 'false'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'build-emulators.yml',
+              ref: 'main'
+            });
+
   build-xemu:
     needs: prepare
     if: needs.prepare.outputs.build_xemu == 'true'
     runs-on: ubuntu-24.04
+    outputs:
+      completed: ${{ steps.build.outputs.completed }}
     steps:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -623,21 +1045,53 @@ jobs:
       - name: Load image
         run: docker load -i /tmp/emu-deps.tar
 
+      - name: Restore ccache
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/ccache-xemu
+          key: ccache-xemu-${{ needs.prepare.outputs.xemu_version }}
+          restore-keys: |
+            ccache-xemu-
+
       - name: Build xemu
+        id: build
         run: |
+          mkdir -p /tmp/ccache-xemu
+
           docker run --rm --platform linux/arm64 \
             -v ${{ github.workspace }}:/workspace \
+            -v /tmp/ccache-xemu:/ccache \
             -e VERSION=${{ needs.prepare.outputs.xemu_version }} \
+            -e CCACHE_DIR=/ccache \
+            -e BUILD_TIMEOUT=${{ env.BUILD_TIMEOUT }} \
             emu-deps-image bash -c '
               set -e
-              git clone --depth 1 --branch "$VERSION" \
-                https://github.com/xemu-project/xemu.git /src
-              cd /src && git submodule update --init --recursive
+
+              export PATH="/usr/lib/ccache:$PATH"
+              export CCACHE_MAXSIZE=5G
+              ccache -z
+
+              if [[ ! -d /workspace/src-xemu ]]; then
+                git clone --depth 1 --branch "$VERSION" \
+                  https://github.com/xemu-project/xemu.git /workspace/src-xemu
+                cd /workspace/src-xemu && git submodule update --init --recursive
+              fi
+
+              cd /workspace/src-xemu
 
               export CFLAGS="-O3 -flto -march=armv8-a+crc+simd -mtune=cortex-a57"
               export CXXFLAGS="-O3 -flto -march=armv8-a+crc+simd -mtune=cortex-a57"
               export LDFLAGS="-ljemalloc"
-              ./build.sh
+
+              timeout ${BUILD_TIMEOUT}s ./build.sh || {
+                EXIT_CODE=$?
+                ccache -s
+                if [[ $EXIT_CODE -eq 124 ]]; then
+                  echo "timeout" > /workspace/build-status
+                  exit 0
+                fi
+                exit $EXIT_CODE
+              }
 
               mkdir -p /tmp/pkg/usr/bin /tmp/pkg/usr/share/applications
               cp dist/xemu /tmp/pkg/usr/bin/
@@ -666,14 +1120,43 @@ jobs:
           Description: xemu Original Xbox Emulator (ARM64 L4T build)
           EOF
               dpkg-deb --build /tmp/pkg /workspace/xemu-l4t_${VERSION_CLEAN}_arm64.deb
+
+              ccache -s
+              echo "completed" > /workspace/build-status
             '
 
+          if [[ -f build-status ]] && [[ "$(cat build-status)" == "completed" ]]; then
+            echo "completed=true" >> $GITHUB_OUTPUT
+          else
+            echo "completed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Save ccache
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: /tmp/ccache-xemu
+          key: ccache-xemu-${{ needs.prepare.outputs.xemu_version }}-${{ github.run_id }}
+
       - name: Upload artifact
+        if: steps.build.outputs.completed == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: deb-xemu
           path: "*.deb"
           retention-days: 1
+
+      - name: Trigger retry if timeout
+        if: steps.build.outputs.completed == 'false'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'build-emulators.yml',
+              ref: 'main'
+            });
 
   build-setperf:
     runs-on: ubuntu-24.04
