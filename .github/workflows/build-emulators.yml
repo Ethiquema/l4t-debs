@@ -70,7 +70,8 @@ jobs:
           MELON_TAG=$(curl -fsSL -H "$AUTH_HEADER" https://api.github.com/repos/melonDS-emu/melonDS/releases/latest | jq -r '.tag_name // empty')
           PPSSPP_TAG=$(curl -fsSL -H "$AUTH_HEADER" https://api.github.com/repos/hrydgard/ppsspp/releases/latest | jq -r '.tag_name // empty')
           XEMU_TAG=$(curl -fsSL -H "$AUTH_HEADER" https://api.github.com/repos/xemu-project/xemu/releases/latest | jq -r '.tag_name // empty')
-          CITRON_TAG=$(curl -fsSL -H "User-Agent: Mozilla/5.0" -H "Accept: application/json" "https://git.citron-emu.org/api/v1/repos/Citron/Emulator/releases?limit=1" | jq -r '.[0].tag_name // empty')
+          # Citron: get latest tag via git ls-remote (API blocked from GitHub Actions)
+          CITRON_TAG=$(git ls-remote --tags --sort=-v:refname https://git.citron-emu.org/Citron/Emulator.git | head -1 | sed 's/.*refs\/tags\///' | sed 's/\^{}//')
 
           # Validate versions are not empty
           if [[ -z "$AZAHAR_TAG" || "$AZAHAR_TAG" == "null" ]]; then
@@ -89,7 +90,7 @@ jobs:
             echo "ERROR: Failed to fetch xemu version"
             exit 1
           fi
-          if [[ -z "$CITRON_TAG" || "$CITRON_TAG" == "null" ]]; then
+          if [[ -z "$CITRON_TAG" ]]; then
             echo "ERROR: Failed to fetch Citron version"
             exit 1
           fi
