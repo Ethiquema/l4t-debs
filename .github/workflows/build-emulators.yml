@@ -13,7 +13,7 @@ permissions:
   actions: write
 
 env:
-  CACHE_KEY: emu-deps-v10
+  CACHE_KEY: emu-deps-base
   BUILD_TIMEOUT: 19800  # 5h30 in seconds (leave 30min for cache save)
 
 jobs:
@@ -184,11 +184,19 @@ jobs:
           path: /tmp/emu-deps.tar
           key: ${{ env.CACHE_KEY }}
 
-      - name: Build and cache base image
+      - name: Create base image if not cached
         if: steps.cache.outputs.cache-hit != 'true'
         run: |
-          docker run --name emu-deps --platform linux/arm64 \
-            ubuntu:24.04 bash -c '
+          docker run --name emu-deps --platform linux/arm64 ubuntu:24.04 bash -c 'echo "base image"'
+          docker commit emu-deps emu-deps-image
+          docker save emu-deps-image -o /tmp/emu-deps.tar
+          docker rm emu-deps
+
+      - name: Load and update base image
+        run: |
+          docker load -i /tmp/emu-deps.tar
+          docker run --name emu-deps-update --platform linux/arm64 \
+            emu-deps-image bash -c '
               set -e
               export DEBIAN_FRONTEND=noninteractive
 
@@ -238,9 +246,9 @@ jobs:
               apt-get clean
               rm -rf /var/lib/apt/lists/*
             '
-          docker commit emu-deps emu-deps-image
+          docker commit emu-deps-update emu-deps-image
           docker save emu-deps-image -o /tmp/emu-deps.tar
-          docker rm emu-deps
+          docker rm emu-deps-update
 
   # ===========================================================================
   # BUILD JOBS (with ccache and timeout handling)
