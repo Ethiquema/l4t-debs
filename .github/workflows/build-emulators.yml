@@ -13,7 +13,7 @@ permissions:
   actions: write
 
 env:
-  CACHE_KEY: emu-deps-v7
+  CACHE_KEY: emu-deps-v8
   BUILD_TIMEOUT: 19800  # 5h30 in seconds (leave 30min for cache save)
 
 jobs:
@@ -158,8 +158,8 @@ jobs:
               apt-get update
               apt-get install -y \
                 build-essential cmake ninja-build git pkg-config meson dpkg-dev \
-                clang llvm libc++-dev libc++abi-dev \
-                ccache \
+                clang llvm lld libc++-dev libc++abi-dev \
+                ccache patchelf \
                 python3 python3-pip python3-yaml \
                 libjemalloc-dev libwayland-dev \
                 qt6-base-dev qt6-base-private-dev qt6-multimedia-dev qt6-tools-dev \
@@ -184,7 +184,17 @@ jobs:
                 libfaad-dev libwebp-dev libsharpyuv-dev libwebpmux3 libwebpdemux2 \
                 libpng-dev libjpeg-dev \
                 libgit2-dev libharfbuzz-dev \
-                gettext
+                gettext \
+                libdbus-1-dev libfontconfig1-dev libudev-dev \
+                libxcb1-dev libxcb-composite0-dev libxcb-cursor-dev libxcb-damage0-dev \
+                libxcb-glx0-dev libxcb-icccm4-dev libxcb-image0-dev libxcb-keysyms1-dev \
+                libxcb-present-dev libxcb-randr0-dev libxcb-render0-dev libxcb-render-util0-dev \
+                libxcb-shape0-dev libxcb-shm0-dev libxcb-sync-dev libxcb-xfixes0-dev \
+                libxcb-xinerama0-dev libxcb-xinput-dev libxcb-xkb-dev \
+                libxkbcommon-dev libxkbcommon-x11-dev libx11-xcb-dev \
+                libdecor-0-dev libegl-dev libopengl-dev libdrm-dev \
+                libpipewire-0.3-dev libinput-dev libgudev-1.0-dev \
+                autoconf automake libtool curl wget xz-utils
 
               apt-get clean
               rm -rf /var/lib/apt/lists/*
@@ -532,63 +542,39 @@ jobs:
               export CCACHE_MAXSIZE=5G
               ccache -z
 
-              # Build zstd 1.5.7+ (DuckStation requires >= 1.5.7, Ubuntu has older)
-              if [[ ! -f /usr/local/lib/libzstd.so ]]; then
-                echo "Building zstd..."
-                git clone --depth 1 --branch v1.5.7 https://github.com/facebook/zstd.git /tmp/zstd
-                cd /tmp/zstd/build/cmake
-                cmake . -G Ninja \
-                  -DCMAKE_BUILD_TYPE=Release \
-                  -DCMAKE_INSTALL_PREFIX=/usr/local
-                ninja -j$(nproc)
-                ninja install
-                ldconfig
-              fi
-
-              # Build SDL3 if not present
-              if [[ ! -d /usr/local/lib/cmake/SDL3 ]]; then
-                echo "Building SDL3..."
-                git clone --depth 1 --branch release-3.4.0 https://github.com/libsdl-org/SDL.git /tmp/sdl3
-                cd /tmp/sdl3
-                mkdir build && cd build
-                cmake .. -G Ninja \
-                  -DCMAKE_BUILD_TYPE=Release \
-                  -DCMAKE_INSTALL_PREFIX=/usr/local \
-                  -DSDL_WAYLAND=ON \
-                  -DSDL_X11=OFF \
-                  -DSDL_VULKAN=ON
-                ninja -j$(nproc)
-                ninja install
-                ldconfig
-              fi
-
+              # Clone source
               if [[ ! -d /workspace/src-duck ]]; then
                 git clone https://github.com/stenzek/duckstation.git /workspace/src-duck
                 cd /workspace/src-duck && git checkout "$COMMIT" && git submodule update --init --recursive
-                sed -i "s/PNG 1.6.53/PNG 1.6.40/" CMakeModules/DuckStationDependencies.cmake || true
               fi
 
               cd /workspace/src-duck
+
+              # Use official dependency build script (builds all deps to exact versions)
+              if [[ ! -d /workspace/duck-deps ]]; then
+                echo "Building dependencies with official script..."
+                scripts/deps/build-dependencies-linux.sh /workspace/duck-deps
+              fi
+
               mkdir -p build && cd build
 
               if [[ ! -f build.ninja ]]; then
-
-              cmake .. -G Ninja \
-                -DCMAKE_BUILD_TYPE=Release \
-                -DCMAKE_INSTALL_PREFIX=/usr \
-                -DCMAKE_PREFIX_PATH=/usr/local \
-                -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-                -DCMAKE_C_COMPILER_LAUNCHER=ccache \
-                -DCMAKE_C_FLAGS="-O3 -flto -march=armv8-a+crc+simd -mtune=cortex-a57" \
-                -DCMAKE_CXX_FLAGS="-O3 -flto -march=armv8-a+crc+simd -mtune=cortex-a57" \
-                -DCMAKE_EXE_LINKER_FLAGS="-ljemalloc -Wl,-rpath,/usr/lib/duckstation" \
-                -DCMAKE_SHARED_LINKER_FLAGS="-ljemalloc" \
-                -DBUILD_QT_FRONTEND=ON \
-                -DBUILD_NOGUI_FRONTEND=OFF \
-                -DENABLE_WAYLAND=ON \
-                -DENABLE_X11=OFF \
-                -DWebP_INCLUDE_DIR=/usr/include/webp \
-                -DWebP_LIBRARY=/usr/lib/aarch64-linux-gnu/libwebp.so
+                cmake .. -G Ninja \
+                  -DCMAKE_BUILD_TYPE=Release \
+                  -DCMAKE_INSTALL_PREFIX=/usr \
+                  -DCMAKE_PREFIX_PATH=/workspace/duck-deps \
+                  -DCMAKE_C_COMPILER=clang \
+                  -DCMAKE_CXX_COMPILER=clang++ \
+                  -DCMAKE_EXE_LINKER_FLAGS_INIT="-fuse-ld=lld -ljemalloc" \
+                  -DCMAKE_MODULE_LINKER_FLAGS_INIT="-fuse-ld=lld" \
+                  -DCMAKE_SHARED_LINKER_FLAGS_INIT="-fuse-ld=lld -ljemalloc" \
+                  -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+                  -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+                  -DCMAKE_C_FLAGS="-O3 -flto=thin -march=armv8-a+crc+simd -mtune=cortex-a57" \
+                  -DCMAKE_CXX_FLAGS="-O3 -flto=thin -march=armv8-a+crc+simd -mtune=cortex-a57" \
+                  -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON \
+                  -DENABLE_WAYLAND=ON \
+                  -DENABLE_X11=OFF
               fi
 
               timeout ${BUILD_TIMEOUT}s ninja -j$(nproc) || {
@@ -603,10 +589,12 @@ jobs:
 
               DESTDIR=/tmp/pkg ninja install
 
-              # Bundle SDL3 and zstd with the package
+              # Bundle the custom-built libraries
               mkdir -p /tmp/pkg/usr/lib/duckstation
-              cp /usr/local/lib/libSDL3.so* /tmp/pkg/usr/lib/duckstation/
-              cp /usr/local/lib/libzstd.so* /tmp/pkg/usr/lib/duckstation/
+              cp /workspace/duck-deps/lib/*.so* /tmp/pkg/usr/lib/duckstation/ 2>/dev/null || true
+
+              # Set rpath for bundled libs
+              patchelf --set-rpath /usr/lib/duckstation /tmp/pkg/usr/bin/duckstation-qt 2>/dev/null || true
 
               PKG_VERSION="0.0.0+git.${SHORT}"
               mkdir -p /tmp/pkg/DEBIAN
@@ -615,11 +603,11 @@ jobs:
           Version: ${PKG_VERSION}
           Architecture: arm64
           Maintainer: Ethiquema <noreply@ethiquema.github.io>
-          Depends: libc6, libjemalloc2, libqt6widgets6, libqt6gui6, libqt6core6, libcurl4t64, libwayland-client0
+          Depends: libc6, libjemalloc2, libdbus-1-3, libcurl4t64, libwayland-client0, libudev1
           Section: games
           Priority: optional
           Description: DuckStation PS1 Emulator (ARM64 L4T build)
-           Includes bundled SDL3 library.
+           Includes bundled Qt6, SDL3 and other libraries.
           EOF
               dpkg-deb --build /tmp/pkg /workspace/duckstation-l4t_${PKG_VERSION}_arm64.deb
 
