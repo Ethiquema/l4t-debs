@@ -5,20 +5,20 @@ Codename: noble
 Architectures: arm64
 Components: main
 Description: L4T packages for Nintendo Switch
-Date: Wed, 21 Jan 2026 20:02:54 +0000
+Date: Wed, 21 Jan 2026 20:53:58 +0000
 MD5Sum:
- f81541f0fd570db20c5dd20e5489191e              200 Release
- 9ee5ada883381cccb06d88f862c06380           206491 main/binary-arm64/Packages
- b3b0fa8bc3068987edfec007d41272e7            54075 main/binary-arm64/Packages.gz
+ 71270e0d301044d44f4b36fe35a4d7a8              200 Release
+ 20206646bb86476a894461ea1f085c0e           206491 main/binary-arm64/Packages
+ 79f20b7fd9525119bfcc0ef308fd06c0            54065 main/binary-arm64/Packages.gz
 SHA1:
- 5468b9065b02f984e24444b4fc1364bbe46a8985              200 Release
- a8982d0bf5bb960207d5580459763263f6701058           206491 main/binary-arm64/Packages
- c9523c47c5baa87d60dce51585c5c3e7c83afae1            54075 main/binary-arm64/Packages.gz
+ ec00d080c979244510d214700193f2bfe1aed293              200 Release
+ 832ec896136478b08ecdd81b08dbbf649c5ed2cf           206491 main/binary-arm64/Packages
+ 1f627b2dbfd2a7563276051f27c6f0e8b3adbbcb            54065 main/binary-arm64/Packages.gz
 SHA256:
- 61654b237cd4c6249f65932282a49a13bd9d211d1d68831a0b3c12bcaf82b0fc              200 Release
- 7edde0d330f009107edcc51da1e13afc5a1fe206e44c70dd25972355a98a2186           206491 main/binary-arm64/Packages
- 586cfb097859365c3ca4c82e9753acdb8a38a34e455a5439c7f945ca215958d4            54075 main/binary-arm64/Packages.gz
+ 6a8b459942c7becb2ec97026d4f285b0e0609ac389cdbbe15316f153aefff853              200 Release
+ dd962048a3d170c185b464c93457d9936fd212d020042dcd389edbfc4b1270f3           206491 main/binary-arm64/Packages
+ 9bb582914f1f085352f8f8ec55ffad31dd1e789a5fd54c31a53803594ee1d18a            54065 main/binary-arm64/Packages.gz
 SHA512:
- 54c31a4693efe857bd4ed7ca3d5e64f3a51ddfb862719eab24d5943b583fad18d156d5a3bf81477b6b21c61f07854124d58b01230fb429e8e91d576b3479c4e4              200 Release
- 76ad427d53f7166e00d5874403fee22e0ae983a0b5fc6832f05bee9804307efcc0552ee1410cd73aaf554613395d6c8c094538decc5c4f29b45d4fff121d53d6           206491 main/binary-arm64/Packages
- ed591bc7c7e441e9b0cf14a49f464520c51d2c5c3990aac3bdbda2c97ddd149032e82b451851a2def146d3bef23a04a49c21fe8ef048d8c534a31566988c04ba            54075 main/binary-arm64/Packages.gz
+ c69614fe059048220eec4743af455620533de3c6e7e7b42a7ef48df8842760facf7b39ee82b34d551309caa5e18b4917a80fbe4d8e20cebfd9f6e242b2b96552              200 Release
+ 0535996ba20c384a84cfbe4fbb89e18e33382a6c6d525424ac7df7007b6bdf9cb9ee4f248e36f472b331852e4d84ba95a03621ed0847a0efe24c402faeee1e4f           206491 main/binary-arm64/Packages
+ fa7df5f10272c3733db495671f79c4b6b0383a6ddeb71953237c64c58229c396e9a140eedb64bfc87ef59dc71e24b444353efa2b2239410b91de36171befa52e            54065 main/binary-arm64/Packages.gz
