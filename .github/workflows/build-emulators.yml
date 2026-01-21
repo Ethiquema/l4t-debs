@@ -13,7 +13,7 @@ permissions:
   actions: write
 
 env:
-  CACHE_KEY: emu-deps-v9
+  CACHE_KEY: emu-deps-v10
   BUILD_TIMEOUT: 19800  # 5h30 in seconds (leave 30min for cache save)
 
 jobs:
@@ -208,7 +208,7 @@ jobs:
                 libpugixml-dev nlohmann-json3-dev \
                 libusb-1.0-0-dev libhidapi-dev libevdev-dev \
                 libspeexdsp-dev glslang-tools spirv-tools \
-                libboost-serialization-dev libcubeb-dev libenet-dev \
+                libboost-serialization-dev libboost-context-dev libcubeb-dev libenet-dev \
                 libsfml-dev libminiupnpc-dev libmbedtls-dev \
                 libsystemd-dev libbluetooth-dev libasound2-dev libpulse-dev \
                 liblzo2-dev libxxhash-dev libspng-dev \
@@ -310,7 +310,8 @@ jobs:
 
               # Fix X11 None macro conflict - undef the X11 macro before settings.h enums
               # X11 headers define "None" as 0L which breaks C++ enums using None as a value
-              sed -i '1s/^/#ifdef None\n#undef None\n#endif\n/' src/common/settings.h
+              { echo "#ifdef None"; echo "#undef None"; echo "#endif"; cat src/common/settings.h; } > src/common/settings.h.tmp
+              mv src/common/settings.h.tmp src/common/settings.h
 
               mkdir -p build && cd build
 
