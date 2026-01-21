@@ -241,7 +241,8 @@ jobs:
                 libxrender-dev libxi-dev libxkbfile-dev libxrandr-dev libxcursor-dev \
                 libdecor-0-dev libegl-dev libopengl-dev libdrm-dev \
                 libpipewire-0.3-dev libinput-dev libgudev-1.0-dev \
-                autoconf automake libtool curl wget xz-utils
+                autoconf automake libtool curl wget xz-utils \
+                catch2
 
               apt-get clean
               rm -rf /var/lib/apt/lists/*
