@@ -308,10 +308,10 @@ Architecture: arm64
 Maintainer: Ethiquema <noreply@ethiquema.github.io>
 Depends: libc6, libjemalloc2, libqt6widgets6, libqt6gui6, libqt6core6, libavcodec60, libavformat60, libswscale7, libevdev2, libminiupnpc17, libmbedtls21, libcurl4t64, libhidapi-hidraw0, libsystemd0, libbluetooth3, libasound2t64, libpulse0, libpugixml1v5, libbz2-1.0, libzstd1, liblzo2-2, libpng16-16t64, libusb-1.0-0, libfmt9, libsfml-system2.6, libsfml-network2.6, libxxhash0, libspng0
 Filename: pool/main/dolphin-emu-l4t_0.0.0+git.2a77193_arm64.deb
-Size: 38518104
-MD5sum: 32b4fba49aaaedd0d32a8aa80cf0f582
-SHA1: bf3992360c525184ff358e05f9fc34f61b5ffc24
-SHA256: 71e789b6ed6a49aa4b0382cd47a1ce808c3dd06a76152280137dae18fd19dda6
+Size: 38657520
+MD5sum: 0fa11e713d1aa7d2fc83caa3bba6c047
+SHA1: 6b08bd91abcad48c27e294311d1a664bda702a32
+SHA256: b7114b32becd55fd6d53e674a14bdc56b1f63e7dacc496cebcb63b2f28ecb592
 Section: games
 Priority: optional
 Description: Dolphin GameCube/Wii Emulator (ARM64 L4T build)
@@ -340,10 +340,10 @@ Depends: libc6, libsdl2-2.0-0, libavcodec60, libavformat60, libswscale7, libfree
 Conflicts: emulationstation
 Provides: emulationstation
 Filename: pool/main/emulationstation-de-l4t_3.4.0_arm64.deb
-Size: 45203992
-MD5sum: a9939629bf40f597823f4ed1095369af
-SHA1: 763f29e87e6bad2e8374fa0139d45b2a8e62f296
-SHA256: dfc12137a72d378c464d31395ceea7ba467f893cabd73d21d0d96779d1f68ee2
+Size: 45204536
+MD5sum: 3720aeb306772e9c0197cba6a14f57b8
+SHA1: 6cd37045140244dfe7a758adba1550dec8eb67b3
+SHA256: a652a4fb30b1706b0a9186926b6c091250bfb414dfa8cd3bb9e75f9b4260e356
 Section: games
 Priority: optional
 Description: EmulationStation Desktop Edition (ARM64 L4T build)
@@ -2622,10 +2622,10 @@ Architecture: arm64
 Maintainer: Ethiquema <noreply@ethiquema.github.io>
 Depends: libc6, libjemalloc2, libqt6widgets6, libqt6gui6, libqt6core6, libqt6multimedia6, libsdl2-2.0-0, libslirp0, libarchive13t64, libzstd1
 Filename: pool/main/melonds-l4t_1.1_arm64.deb
-Size: 1544576
-MD5sum: 5b3894d8e62a580aaf19854ace1831f1
-SHA1: 0950cedd162c7560b41a7e3505fc491500996bb9
-SHA256: 456a496a3bb34d67282a27b1582439737b1b6487b6f4366b6ae4b79386a6fb74
+Size: 1544560
+MD5sum: 6bb87418e5483944e24691b91e465e90
+SHA1: e23841f547e1557833ff1c5bde790eacb5697c2a
+SHA256: c913b11312558209c2605c4b358f1cf8f781bc3f43be5e743067bf5b3c06b2b5
 Section: games
 Priority: optional
 Description: melonDS Nintendo DS Emulator (ARM64 L4T build)
@@ -3220,10 +3220,10 @@ Depends: libc6, libjemalloc2, libsdl2-2.0-0, libsdl2-ttf-2.0-0, libglew2.2, libs
 Conflicts: ppsspp
 Provides: ppsspp
 Filename: pool/main/ppsspp-l4t_1.19.3_arm64.deb
-Size: 21536294
-MD5sum: 599c943dd3a7d5816baee976c04396d8
-SHA1: 2aba1802a09dd46d2c33eda256c01843d0939d5e
-SHA256: 363048ec5b7b642d28dcc6ecf609c1d5d8411bc109f13376662cc5193f771026
+Size: 21566866
+MD5sum: 5c50d3e479b92939663759df0d8d1515
+SHA1: d7ad84b73ffafb31fa9f124b2ec97bdc71460dd4
+SHA256: fb50da114f569d6c8383c8a8dcbbd36ef7f0eb721af7a7a1aef65199112eaf06
 Section: games
 Priority: optional
 Description: PPSSPP PlayStation Portable Emulator (ARM64 L4T build)
@@ -3255,10 +3255,10 @@ Architecture: arm64
 Maintainer: Ethiquema <noreply@ethiquema.github.io>
 Depends: bash
 Filename: pool/main/setperf_1.0.0_arm64.deb
-Size: 4122
-MD5sum: 35c632b59375ac5fc441b3b3f9b6e19c
-SHA1: 58697b2b49cfc98bc1b4fc6f86fb0d5ce7725880
-SHA256: bbb8b91901642e75cee54e54abf3eb3c5d2f58800e0e2f46dd1a2c3d3125820c
+Size: 4124
+MD5sum: b364dbb80c65057bf8cd2de15859545c
+SHA1: 92453dcfa71a57c82666c9d0707b45d0eaef037d
+SHA256: 43d1fe7270d4c22971bc61e52068551596fb699b3c561def008fb60aadab4e9e
 Section: utils
 Priority: optional
 Description: Nintendo Switch performance tuning wrapper
@@ -3610,10 +3610,10 @@ Architecture: arm64
 Maintainer: Ethiquema <noreply@ethiquema.github.io>
 Depends: libc6, libjemalloc2, libsdl2-2.0-0, libepoxy0, libpixman-1-0, libgtk-3-0t64, libssl3t64, libsamplerate0, libpcap0.8t64, libslirp0
 Filename: pool/main/xemu-l4t_0.8.133_arm64.deb
-Size: 30228298
-MD5sum: 63c51c430c2b2938d35770e75659741e
-SHA1: 37fb5420722648f8d6617f5002b737063cad7a1e
-SHA256: c0b2f5e45596c5aae24f04cbceda5fcc26a8171e5689f215bf6d6c1f07b4240e
+Size: 30228576
+MD5sum: b81bdaa0b0ae1ecc58d3a9776ffe769c
+SHA1: 2b2cfe49e24b710782e5261bffa35199da9f969a
+SHA256: 792540905ef4177b23e07f8efe302c7e893ad6c3774267768d4aeb01a927dc90
 Section: games
 Priority: optional
 Description: xemu Original Xbox Emulator (ARM64 L4T build)
