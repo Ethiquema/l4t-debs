@@ -553,6 +553,10 @@ jobs:
               # Use official dependency build script (builds all deps to exact versions)
               if [[ ! -d /workspace/duck-deps ]]; then
                 echo "Building dependencies with official script..."
+                # Patch script: Wayland-only (no X11/xcb) and use system harfbuzz
+                sed -i "s/-qpa xcb,wayland/-qpa wayland/" scripts/deps/build-dependencies-linux.sh
+                sed -i "s/-DFEATURE_xcb=ON/-DFEATURE_xcb=OFF/" scripts/deps/build-dependencies-linux.sh
+                sed -i "s/-system-harfbuzz//" scripts/deps/build-dependencies-linux.sh
                 scripts/deps/build-dependencies-linux.sh /workspace/duck-deps
               fi
 
