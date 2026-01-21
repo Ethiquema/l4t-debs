@@ -281,11 +281,13 @@ jobs:
 
               # Clone source
               if [[ ! -d /workspace/src-azahar ]]; then
-                git clone --depth 1 --branch "$VERSION" --recurse-submodules \
-                  https://github.com/azahar-emu/azahar.git /workspace/src-azahar
+                git clone https://github.com/azahar-emu/azahar.git /workspace/src-azahar
               fi
 
               cd /workspace/src-azahar
+              git fetch origin --tags
+              git checkout "$VERSION"
+              git submodule update --init --recursive
               mkdir -p build && cd build
 
               # Configure if needed
@@ -429,10 +431,12 @@ jobs:
 
               if [[ ! -d /workspace/src-dolphin ]]; then
                 git clone https://github.com/dolphin-emu/dolphin.git /workspace/src-dolphin
-                cd /workspace/src-dolphin && git checkout "$COMMIT" && git submodule update --init --recursive
               fi
 
               cd /workspace/src-dolphin
+              git fetch origin
+              git checkout "$COMMIT"
+              git submodule update --init --recursive
               mkdir -p build && cd build
 
               if [[ ! -f build.ninja ]]; then
@@ -565,10 +569,12 @@ jobs:
               # Clone source
               if [[ ! -d /workspace/src-duck ]]; then
                 git clone https://github.com/stenzek/duckstation.git /workspace/src-duck
-                cd /workspace/src-duck && git checkout "$COMMIT" && git submodule update --init --recursive
               fi
 
               cd /workspace/src-duck
+              git fetch origin
+              git checkout "$COMMIT"
+              git submodule update --init --recursive
 
               # Use official dependency build script (builds all deps to exact versions)
               if [[ ! -d /workspace/duck-deps ]]; then
@@ -720,11 +726,12 @@ jobs:
               ccache -z
 
               if [[ ! -d /workspace/src-esde ]]; then
-                git clone --depth 1 --branch "$VERSION" \
-                  https://gitlab.com/es-de/emulationstation-de.git /workspace/src-esde
+                git clone https://gitlab.com/es-de/emulationstation-de.git /workspace/src-esde
               fi
 
               cd /workspace/src-esde
+              git fetch origin --tags
+              git checkout "$VERSION"
               mkdir -p build && cd build
 
               if [[ ! -f build.ninja ]]; then
@@ -849,11 +856,12 @@ jobs:
               ccache -z
 
               if [[ ! -d /workspace/src-melonds ]]; then
-                git clone --depth 1 --branch "$VERSION" \
-                  https://github.com/melonDS-emu/melonDS.git /workspace/src-melonds
+                git clone https://github.com/melonDS-emu/melonDS.git /workspace/src-melonds
               fi
 
               cd /workspace/src-melonds
+              git fetch origin --tags
+              git checkout "$VERSION"
               mkdir -p build && cd build
 
               if [[ ! -f build.ninja ]]; then
@@ -979,11 +987,13 @@ jobs:
               ccache -z
 
               if [[ ! -d /workspace/src-ppsspp ]]; then
-                git clone --depth 1 --branch "$VERSION" --recurse-submodules \
-                  https://github.com/hrydgard/ppsspp.git /workspace/src-ppsspp
+                git clone https://github.com/hrydgard/ppsspp.git /workspace/src-ppsspp
               fi
 
               cd /workspace/src-ppsspp
+              git fetch origin --tags
+              git checkout "$VERSION"
+              git submodule update --init --recursive
               mkdir -p build && cd build
 
               if [[ ! -f build.ninja ]]; then
@@ -1128,12 +1138,13 @@ jobs:
               ccache -z
 
               if [[ ! -d /workspace/src-xemu ]]; then
-                git clone --depth 1 --branch "$VERSION" \
-                  https://github.com/xemu-project/xemu.git /workspace/src-xemu
-                cd /workspace/src-xemu && git submodule update --init --recursive
+                git clone https://github.com/xemu-project/xemu.git /workspace/src-xemu
               fi
 
               cd /workspace/src-xemu
+              git fetch origin --tags
+              git checkout "$VERSION"
+              git submodule update --init --recursive
 
               export CFLAGS="-O3 -flto -march=armv8-a+crc+simd -mtune=cortex-a57"
               export CXXFLAGS="-O3 -flto -march=armv8-a+crc+simd -mtune=cortex-a57"
