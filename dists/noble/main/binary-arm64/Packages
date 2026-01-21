@@ -326,10 +326,10 @@ Depends: libc6, libsdl2-2.0-0, libavcodec60, libavformat60, libswscale7, libfree
 Conflicts: emulationstation
 Provides: emulationstation
 Filename: pool/main/emulationstation-de-l4t_3.4.0_arm64.deb
-Size: 45204108
-MD5sum: d9ff94d86b06d78f5527beb1c5ae22b4
-SHA1: 28a4ee056ef9c51648507578f797bcd1ec7e4533
-SHA256: 7c94037282e98a086bebb3473264f2467d52b198f23d44a8bca6eff21532020c
+Size: 45204242
+MD5sum: 8514ede0f54692cac349fd2c8dfb096e
+SHA1: e645977d1bc4386f8a15406f9fad1c43d4081a15
+SHA256: 8d614607e4f8c58cdecdbff4d3cc589e726000035e72328ded29c27de8477b26
 Section: games
 Priority: optional
 Description: EmulationStation Desktop Edition (ARM64 L4T build)
@@ -2608,10 +2608,10 @@ Architecture: arm64
 Maintainer: Ethiquema <noreply@ethiquema.github.io>
 Depends: libc6, libjemalloc2, libqt6widgets6, libqt6gui6, libqt6core6, libqt6multimedia6, libsdl2-2.0-0, libslirp0, libarchive13t64, libzstd1
 Filename: pool/main/melonds-l4t_1.1_arm64.deb
-Size: 1544542
-MD5sum: dc79d729864ef2bc51ccc011ca2fee20
-SHA1: 7cbd2f01ab3f5ce0d216eddb1714ee041039dac4
-SHA256: 5853047cdb8949e4ec326a896cad76f5ebbe25b4b5c60a1b1cd64f94139b80e8
+Size: 1544444
+MD5sum: 53fe5ce4fbf6a9d674ce27814034f6e9
+SHA1: 905a1a5afc9eff6a147bffbad4e2e25f03536835
+SHA256: 1ba7f929f8d0158ffc0043c9d1332163e52138d00f97c9683e4d2befbccd3808
 Section: games
 Priority: optional
 Description: melonDS Nintendo DS Emulator (ARM64 L4T build)
@@ -3206,10 +3206,10 @@ Depends: libc6, libjemalloc2, libsdl2-2.0-0, libsdl2-ttf-2.0-0, libglew2.2, libs
 Conflicts: ppsspp
 Provides: ppsspp
 Filename: pool/main/ppsspp-l4t_1.19.3_arm64.deb
-Size: 21533276
-MD5sum: 1d80fec6f571cb08745e4eddbbc68e21
-SHA1: 5a6ea185c84e334b98cf7a457a0a30eae6232532
-SHA256: 7ac36f19ba6829ad17bb39ed9655f804a2aad50fbee2fac5493e64a409a3a6ac
+Size: 21536424
+MD5sum: 4bc35263ab7caaa5abdf07063779d3c5
+SHA1: 632df7835a5c22810f4605e019b748c4ea7d4834
+SHA256: 8ea945dfdde8bb798ee585d1fe7b861259427929139e0783d54fc72573064494
 Section: games
 Priority: optional
 Description: PPSSPP PlayStation Portable Emulator (ARM64 L4T build)
@@ -3241,10 +3241,10 @@ Architecture: arm64
 Maintainer: Ethiquema <noreply@ethiquema.github.io>
 Depends: bash
 Filename: pool/main/setperf_1.0.0_arm64.deb
-Size: 4124
-MD5sum: 758e9d175c14e9a42a8e61d0d7a090aa
-SHA1: 051393e9b07c1705bd186a8a330586905041ba03
-SHA256: 74f4f7860fec982b4261e67fd908c50093010dd221565f6087b07b7c500eedfa
+Size: 4120
+MD5sum: 32d625d94b1fefe2e6af89bbb1a2283b
+SHA1: 1799bd88fc4c7ce544d0d7744877ba50b843845c
+SHA256: 817b086b2f8837b8440a93248612d6c575d1a4939e27ccf2d7b04fbd52485dd5
 Section: utils
 Priority: optional
 Description: Nintendo Switch performance tuning wrapper
