@@ -32,6 +32,7 @@ jobs:
       melonds_version: ${{ steps.versions.outputs.melonds_version }}
       ppsspp_version: ${{ steps.versions.outputs.ppsspp_version }}
       xemu_version: ${{ steps.versions.outputs.xemu_version }}
+      citron_version: ${{ steps.versions.outputs.citron_version }}
       build_azahar: ${{ steps.versions.outputs.build_azahar }}
       build_dolphin: ${{ steps.versions.outputs.build_dolphin }}
       build_duckstation: ${{ steps.versions.outputs.build_duckstation }}
@@ -39,6 +40,7 @@ jobs:
       build_melonds: ${{ steps.versions.outputs.build_melonds }}
       build_ppsspp: ${{ steps.versions.outputs.build_ppsspp }}
       build_xemu: ${{ steps.versions.outputs.build_xemu }}
+      build_citron: ${{ steps.versions.outputs.build_citron }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -56,6 +58,7 @@ jobs:
           CURRENT_MELON=$(cat .melonds-version 2>/dev/null || echo "")
           CURRENT_PPSSPP=$(cat .ppsspp-version 2>/dev/null || echo "")
           CURRENT_XEMU=$(cat .xemu-version 2>/dev/null || echo "")
+          CURRENT_CITRON=$(cat .citron-version 2>/dev/null || echo "")
 
           # Fetch latest versions from upstream (with auth to avoid rate limits)
           AUTH_HEADER="Authorization: token ${{ github.token }}"
@@ -67,6 +70,7 @@ jobs:
           MELON_TAG=$(curl -fsSL -H "$AUTH_HEADER" https://api.github.com/repos/melonDS-emu/melonDS/releases/latest | jq -r '.tag_name // empty')
           PPSSPP_TAG=$(curl -fsSL -H "$AUTH_HEADER" https://api.github.com/repos/hrydgard/ppsspp/releases/latest | jq -r '.tag_name // empty')
           XEMU_TAG=$(curl -fsSL -H "$AUTH_HEADER" https://api.github.com/repos/xemu-project/xemu/releases/latest | jq -r '.tag_name // empty')
+          CITRON_TAG=$(curl -fsSL "https://git.citron-emu.org/api/v1/repos/Citron/Emulator/releases?limit=1" | jq -r '.[0].tag_name // empty')
 
           # Validate versions are not empty
           if [[ -z "$AZAHAR_TAG" || "$AZAHAR_TAG" == "null" ]]; then
@@ -85,6 +89,10 @@ jobs:
             echo "ERROR: Failed to fetch xemu version"
             exit 1
           fi
+          if [[ -z "$CITRON_TAG" || "$CITRON_TAG" == "null" ]]; then
+            echo "ERROR: Failed to fetch Citron version"
+            exit 1
+          fi
 
           # Output versions
           echo "azahar_version=$AZAHAR_TAG" >> $GITHUB_OUTPUT
@@ -96,6 +104,7 @@ jobs:
           echo "melonds_version=$MELON_TAG" >> $GITHUB_OUTPUT
           echo "ppsspp_version=$PPSSPP_TAG" >> $GITHUB_OUTPUT
           echo "xemu_version=$XEMU_TAG" >> $GITHUB_OUTPUT
+          echo "citron_version=$CITRON_TAG" >> $GITHUB_OUTPUT
 
           # Force rebuild on workflow changes or manual dispatch
           FORCE_REBUILD="${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}"
@@ -143,6 +152,12 @@ jobs:
             echo "build_xemu=false" >> $GITHUB_OUTPUT
           fi
 
+          if [[ "$FORCE_REBUILD" == "true" ]] || [[ "$CITRON_TAG" != "$CURRENT_CITRON" ]]; then
+            echo "build_citron=true" >> $GITHUB_OUTPUT
+          else
+            echo "build_citron=false" >> $GITHUB_OUTPUT
+          fi
+
           echo "Force rebuild: $FORCE_REBUILD"
 
           # Log status
@@ -154,6 +169,7 @@ jobs:
           echo "melonDS: $CURRENT_MELON -> $MELON_TAG"
           echo "PPSSPP: $CURRENT_PPSSPP -> $PPSSPP_TAG"
           echo "xemu: $CURRENT_XEMU -> $XEMU_TAG"
+          echo "Citron: $CURRENT_CITRON -> $CITRON_TAG"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -1230,6 +1246,145 @@ jobs:
               ref: 'main'
             });
 
+  build-citron:
+    needs: prepare
+    if: needs.prepare.outputs.build_citron == 'true'
+    runs-on: ubuntu-24.04
+    outputs:
+      completed: ${{ steps.build.outputs.completed }}
+    steps:
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Restore cached image
+        uses: actions/cache@v4
+        with:
+          path: /tmp/emu-deps.tar
+          key: ${{ env.CACHE_KEY }}
+
+      - name: Load image
+        run: docker load -i /tmp/emu-deps.tar
+
+      - name: Restore ccache
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/ccache-citron
+          key: ccache-citron-${{ needs.prepare.outputs.citron_version }}
+          restore-keys: |
+            ccache-citron-
+
+      - name: Build Citron
+        id: build
+        run: |
+          mkdir -p /tmp/ccache-citron
+
+          docker run --rm --platform linux/arm64 \
+            -v ${{ github.workspace }}:/workspace \
+            -v /tmp/ccache-citron:/ccache \
+            -e VERSION=${{ needs.prepare.outputs.citron_version }} \
+            -e CCACHE_DIR=/ccache \
+            -e BUILD_TIMEOUT=${{ env.BUILD_TIMEOUT }} \
+            emu-deps-image bash -c '
+              set -e
+
+              export PATH="/usr/lib/ccache:$PATH"
+              export CCACHE_MAXSIZE=5G
+              ccache -z
+
+              # Clone source from Citron Forgejo
+              if [[ ! -d /workspace/src-citron ]]; then
+                git clone https://git.citron-emu.org/Citron/Emulator.git /workspace/src-citron
+              fi
+
+              cd /workspace/src-citron
+              git fetch origin --tags
+              git checkout "$VERSION"
+              git submodule update --init --recursive
+
+              mkdir -p build && cd build
+
+              if [[ ! -f build.ninja ]]; then
+                cmake .. -G Ninja \
+                  -DCMAKE_BUILD_TYPE=Release \
+                  -DCMAKE_INSTALL_PREFIX=/usr \
+                  -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+                  -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+                  -DCMAKE_CXX_COMPILER=clang++ \
+                  -DCMAKE_C_COMPILER=clang \
+                  -DCMAKE_C_FLAGS="-O3 -flto=thin -march=armv8-a+crc+simd -mtune=cortex-a57" \
+                  -DCMAKE_CXX_FLAGS="-O3 -flto=thin -march=armv8-a+crc+simd -mtune=cortex-a57" \
+                  -DCMAKE_EXE_LINKER_FLAGS="-ljemalloc" \
+                  -DCMAKE_SHARED_LINKER_FLAGS="-ljemalloc" \
+                  -DYUZU_USE_BUNDLED_VCPKG=OFF \
+                  -DYUZU_TESTS=OFF \
+                  -DENABLE_QT_TRANSLATION=OFF \
+                  -DSPIRV_WERROR=OFF
+              fi
+
+              timeout ${BUILD_TIMEOUT}s ninja -j$(nproc) || {
+                EXIT_CODE=$?
+                ccache -s
+                if [[ $EXIT_CODE -eq 124 ]]; then
+                  echo "timeout" > /workspace/build-status
+                  exit 0
+                fi
+                exit $EXIT_CODE
+              }
+
+              DESTDIR=/tmp/pkg ninja install
+              VERSION_CLEAN=$(echo "$VERSION" | sed "s/^v//")
+              mkdir -p /tmp/pkg/DEBIAN
+              cat > /tmp/pkg/DEBIAN/control << EOF
+          Package: citron-emu-l4t
+          Version: ${VERSION_CLEAN}
+          Architecture: arm64
+          Maintainer: Ethiquema <noreply@ethiquema.github.io>
+          Depends: libc6, libjemalloc2, libqt6widgets6, libqt6gui6, libqt6core6, libqt6multimedia6, libqt6opengl6, libsdl2-2.0-0, libssl3t64, libavcodec60, libavformat60, libswscale7, libopus0, libzstd1, libusb-1.0-0, libva2, liblz4-1
+          Section: games
+          Priority: optional
+          Description: Citron Nintendo Switch Emulator (ARM64 L4T build)
+          EOF
+              dpkg-deb --build /tmp/pkg /workspace/citron-emu-l4t_${VERSION_CLEAN}_arm64.deb
+
+              ccache -s
+              echo "completed" > /workspace/build-status
+            '
+
+          if [[ -f build-status ]] && [[ "$(cat build-status)" == "completed" ]]; then
+            echo "completed=true" >> $GITHUB_OUTPUT
+          else
+            echo "completed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Save ccache
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: /tmp/ccache-citron
+          key: ccache-citron-${{ needs.prepare.outputs.citron_version }}-${{ github.run_id }}
+
+      - name: Upload artifact
+        if: steps.build.outputs.completed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: deb-citron
+          path: "*.deb"
+          retention-days: 1
+
+      - name: Trigger retry if timeout
+        if: steps.build.outputs.completed == 'false'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'build-emulators.yml',
+              ref: 'main'
+            });
+
   build-setperf:
     runs-on: ubuntu-24.04
     steps:
@@ -1255,7 +1410,7 @@ jobs:
   # UPDATE REPO: Collect all debs and update APT repository
   # ===========================================================================
   update-repo:
-    needs: [prepare, build-azahar, build-dolphin, build-duckstation, build-esde, build-melonds, build-ppsspp, build-xemu, build-setperf]
+    needs: [prepare, build-azahar, build-dolphin, build-duckstation, build-esde, build-melonds, build-ppsspp, build-xemu, build-citron, build-setperf]
     if: always()
     runs-on: ubuntu-24.04
     steps:
