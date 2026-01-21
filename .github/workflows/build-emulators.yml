@@ -209,6 +209,7 @@ jobs:
                 libjemalloc-dev libwayland-dev \
                 qt6-base-dev qt6-base-private-dev qt6-multimedia-dev qt6-tools-dev \
                 libqt6opengl6-dev libqt6svg6-dev \
+                qtbase5-dev qtbase5-private-dev qtmultimedia5-dev qttools5-dev \
                 libsdl2-dev libsdl2-ttf-dev \
                 libavcodec-dev libavformat-dev libavutil-dev libswscale-dev libavfilter-dev \
                 libssl-dev libcurl4-openssl-dev \
@@ -1330,6 +1331,7 @@ jobs:
                   -DCMAKE_SHARED_LINKER_FLAGS="-ljemalloc" \
                   -DCITRON_USE_BUNDLED_VCPKG=OFF \
                   -DUSE_SYSTEM_QT=ON \
+                  -DENABLE_QT6=OFF \
                   -DCITRON_TESTS=OFF \
                   -DBUILD_TESTING=OFF \
                   -DENABLE_QT_TRANSLATION=OFF \
