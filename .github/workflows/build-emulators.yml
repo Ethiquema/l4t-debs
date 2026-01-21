@@ -13,7 +13,7 @@ permissions:
   actions: write
 
 env:
-  CACHE_KEY: emu-deps-v8
+  CACHE_KEY: emu-deps-v9
   BUILD_TIMEOUT: 19800  # 5h30 in seconds (leave 30min for cache save)
 
 jobs:
@@ -211,7 +211,9 @@ jobs:
                 libxcb-present-dev libxcb-randr0-dev libxcb-render0-dev libxcb-render-util0-dev \
                 libxcb-shape0-dev libxcb-shm0-dev libxcb-sync-dev libxcb-xfixes0-dev \
                 libxcb-xinerama0-dev libxcb-xinput-dev libxcb-xkb-dev \
-                libxkbcommon-dev libxkbcommon-x11-dev libx11-xcb-dev \
+                libxcb-util-dev libxcb-util0-dev libxcb-ewmh-dev libxcb-dri2-0-dev libxcb-dri3-dev \
+                libxkbcommon-dev libxkbcommon-x11-dev libx11-xcb-dev libx11-dev libxext-dev \
+                libxrender-dev libxi-dev libxkbfile-dev libxrandr-dev libxcursor-dev \
                 libdecor-0-dev libegl-dev libopengl-dev libdrm-dev \
                 libpipewire-0.3-dev libinput-dev libgudev-1.0-dev \
                 autoconf automake libtool curl wget xz-utils
@@ -288,6 +290,11 @@ jobs:
               git fetch origin --tags
               git checkout "$VERSION"
               git submodule update --init --recursive
+
+              # Fix X11 None macro conflict - undef the X11 macro before settings.h enums
+              # X11 headers define "None" as 0L which breaks C++ enums using None as a value
+              sed -i '1s/^/#ifdef None\n#undef None\n#endif\n/' src/common/settings.h
+
               mkdir -p build && cd build
 
               # Configure if needed
@@ -306,10 +313,10 @@ jobs:
                   -DENABLE_VULKAN=ON \
                   -DENABLE_OPENGL=ON \
                   -DENABLE_QT_GUI=ON \
-                  -DENABLE_SDL2_FRONTEND=ON \
+                  -DENABLE_SDL2_FRONTEND=OFF \
                   -DENABLE_TESTS=OFF \
                   -DENABLE_WEB_SERVICE=OFF \
-                  -DENABLE_X11=OFF
+                  -DENABLE_X11=ON
               fi
 
               # Build with timeout check
@@ -450,8 +457,8 @@ jobs:
                   -DCMAKE_EXE_LINKER_FLAGS="-ljemalloc" \
                   -DCMAKE_SHARED_LINKER_FLAGS="-ljemalloc" \
                   -DENABLE_VULKAN=ON \
-                  -DENABLE_X11=OFF \
-                  -DENABLE_WAYLAND=ON \
+                  -DENABLE_X11=ON \
+                  -DENABLE_WAYLAND=OFF \
                   -DENABLE_TESTS=OFF \
                   -DENABLE_ANALYTICS=OFF
               fi
@@ -579,9 +586,7 @@ jobs:
               # Use official dependency build script (builds all deps to exact versions)
               if [[ ! -d /workspace/duck-deps ]]; then
                 echo "Building dependencies with official script..."
-                # Patch script: Wayland-only (no X11/xcb) and use system harfbuzz
-                sed -i "s/-qpa xcb,wayland/-qpa wayland/" scripts/deps/build-dependencies-linux.sh
-                sed -i "s/-DFEATURE_xcb=ON/-DFEATURE_xcb=OFF/" scripts/deps/build-dependencies-linux.sh
+                # Remove -system-harfbuzz to use bundled version (system has incompatible version)
                 sed -i "s/-system-harfbuzz//" scripts/deps/build-dependencies-linux.sh
                 scripts/deps/build-dependencies-linux.sh /workspace/duck-deps
               fi
@@ -603,8 +608,8 @@ jobs:
                   -DCMAKE_C_FLAGS="-O3 -flto=thin -march=armv8-a+crc+simd -mtune=cortex-a57" \
                   -DCMAKE_CXX_FLAGS="-O3 -flto=thin -march=armv8-a+crc+simd -mtune=cortex-a57" \
                   -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON \
-                  -DENABLE_WAYLAND=ON \
-                  -DENABLE_X11=OFF
+                  -DENABLE_WAYLAND=OFF \
+                  -DENABLE_X11=ON
               fi
 
               timeout ${BUILD_TIMEOUT}s ninja -j$(nproc) || {
@@ -873,8 +878,7 @@ jobs:
                   -DCMAKE_C_FLAGS="-O3 -flto -march=armv8-a+crc+simd -mtune=cortex-a57" \
                   -DCMAKE_CXX_FLAGS="-O3 -flto -march=armv8-a+crc+simd -mtune=cortex-a57" \
                   -DCMAKE_EXE_LINKER_FLAGS="-ljemalloc" \
-                  -DCMAKE_SHARED_LINKER_FLAGS="-ljemalloc" \
-                  -DENABLE_WAYLAND=ON
+                  -DCMAKE_SHARED_LINKER_FLAGS="-ljemalloc"
               fi
 
               timeout ${BUILD_TIMEOUT}s ninja -j$(nproc) || {
@@ -1008,7 +1012,7 @@ jobs:
                   -DCMAKE_SHARED_LINKER_FLAGS="-ljemalloc" \
                   -DUSING_QT_UI=OFF \
                   -DHEADLESS=OFF \
-                  -DUSE_WAYLAND_WSI=ON \
+                  -DUSE_WAYLAND_WSI=OFF \
                   -DVULKAN=ON
               fi
 
@@ -1150,7 +1154,8 @@ jobs:
               export CXXFLAGS="-O3 -flto -march=armv8-a+crc+simd -mtune=cortex-a57"
               export LDFLAGS="-ljemalloc"
 
-              timeout ${BUILD_TIMEOUT}s ./build.sh || {
+              # Build with X11 (XWayland)
+              timeout ${BUILD_TIMEOUT}s ./build.sh --enable-sdl --disable-werror || {
                 EXIT_CODE=$?
                 ccache -s
                 if [[ $EXIT_CODE -eq 124 ]]; then
