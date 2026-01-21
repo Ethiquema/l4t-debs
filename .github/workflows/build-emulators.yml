@@ -70,7 +70,7 @@ jobs:
           MELON_TAG=$(curl -fsSL -H "$AUTH_HEADER" https://api.github.com/repos/melonDS-emu/melonDS/releases/latest | jq -r '.tag_name // empty')
           PPSSPP_TAG=$(curl -fsSL -H "$AUTH_HEADER" https://api.github.com/repos/hrydgard/ppsspp/releases/latest | jq -r '.tag_name // empty')
           XEMU_TAG=$(curl -fsSL -H "$AUTH_HEADER" https://api.github.com/repos/xemu-project/xemu/releases/latest | jq -r '.tag_name // empty')
-          CITRON_TAG=$(curl -fsSL "https://git.citron-emu.org/api/v1/repos/Citron/Emulator/releases?limit=1" | jq -r '.[0].tag_name // empty')
+          CITRON_TAG=$(curl -fsSL -A "GitHub-Actions" "https://git.citron-emu.org/api/v1/repos/Citron/Emulator/releases?limit=1" | jq -r '.[0].tag_name // empty')
 
           # Validate versions are not empty
           if [[ -z "$AZAHAR_TAG" || "$AZAHAR_TAG" == "null" ]]; then
