@@ -1318,7 +1318,7 @@ jobs:
               # Build Qt6 from source (Ubuntu packages lack Qt6GuiPrivate)
               QT_VERSION="6.7.3"
               QT_PREFIX="/workspace/qt6"
-              if [[ ! -d "$QT_PREFIX" ]]; then
+              if [[ ! -f "$QT_PREFIX/lib/libQt6Core.so" ]]; then
                 echo "Building Qt6 $QT_VERSION from source..."
                 cd /workspace
                 wget -q https://download.qt.io/official_releases/qt/6.7/$QT_VERSION/submodules/qtbase-everywhere-src-$QT_VERSION.tar.xz
