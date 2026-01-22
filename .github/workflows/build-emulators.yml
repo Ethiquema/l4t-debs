@@ -1262,6 +1262,7 @@ jobs:
     needs: prepare
     if: needs.prepare.outputs.build_citron == 'true'
     runs-on: ubuntu-24.04
+    timeout-minutes: 355
     outputs:
       completed: ${{ steps.build.outputs.completed }}
     steps:
@@ -1301,13 +1302,15 @@ jobs:
           mkdir -p /tmp/ccache-citron
           mkdir -p /tmp/qt6-citron
 
-          docker run --rm --platform linux/arm64 \
+          # Run entire build with global timeout to ensure cache save runs before GitHub kills job
+          # Use || to capture exit code without triggering set -e
+          EXIT_CODE=0
+          timeout ${{ env.BUILD_TIMEOUT }}s docker run --rm --platform linux/arm64 \
             -v ${{ github.workspace }}:/workspace \
             -v /tmp/ccache-citron:/ccache \
             -v /tmp/qt6-citron:/workspace/qt6 \
             -e VERSION=${{ needs.prepare.outputs.citron_version }} \
             -e CCACHE_DIR=/ccache \
-            -e BUILD_TIMEOUT=${{ env.BUILD_TIMEOUT }} \
             emu-deps-image bash -c '
               set -e
 
@@ -1414,15 +1417,7 @@ jobs:
                   -DSPIRV_WERROR=OFF
               fi
 
-              timeout ${BUILD_TIMEOUT}s ninja -j$(nproc) || {
-                EXIT_CODE=$?
-                ccache -s
-                if [[ $EXIT_CODE -eq 124 ]]; then
-                  echo "timeout" > /workspace/build-status
-                  exit 0
-                fi
-                exit $EXIT_CODE
-              }
+              ninja -j$(nproc)
 
               DESTDIR=/tmp/pkg ninja install
               VERSION_CLEAN=$(echo "$VERSION" | sed "s/^v//")
@@ -1451,9 +1446,17 @@ jobs:
 
               ccache -s
               echo "completed" > /workspace/build-status
-            '
+            ' || EXIT_CODE=$?
 
-          if [[ -f build-status ]] && [[ "$(cat build-status)" == "completed" ]]; then
+          # Handle result: timeout (124), error (other), or success (0)
+          echo "Docker exit code: $EXIT_CODE"
+          if [[ $EXIT_CODE -eq 124 ]]; then
+            echo "TIMEOUT - build will resume with cache on retry"
+            echo "completed=false" >> $GITHUB_OUTPUT
+          elif [[ $EXIT_CODE -ne 0 ]]; then
+            echo "BUILD FAILED with exit code $EXIT_CODE"
+            exit $EXIT_CODE
+          elif [[ -f build-status ]] && [[ "$(cat build-status)" == "completed" ]]; then
             echo "completed=true" >> $GITHUB_OUTPUT
           else
             echo "completed=false" >> $GITHUB_OUTPUT
