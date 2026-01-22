@@ -340,10 +340,10 @@ Depends: libc6, libsdl2-2.0-0, libavcodec60, libavformat60, libswscale7, libfree
 Conflicts: emulationstation
 Provides: emulationstation
 Filename: pool/main/emulationstation-de-l4t_3.4.0_arm64.deb
-Size: 45205032
-MD5sum: 5be86b4174e0e4c70c62406e21360546
-SHA1: 40d857c7bec8bf308e46e3cedefcaa30222d6898
-SHA256: 54bff8312b39a5e585b6f5ab4c0e5ecd6576540dd5d2ff3041eec8b559333293
+Size: 45204822
+MD5sum: 2a9e7a4ada59ec40c354521f1dcfb264
+SHA1: 4976d42b8efa8f771443789d2891d5cf10f66616
+SHA256: ebc43a9722ff28527c2c3be7938e73cb013b05285e3732047830c94692b8898e
 Section: games
 Priority: optional
 Description: EmulationStation Desktop Edition (ARM64 L4T build)
@@ -2622,10 +2622,10 @@ Architecture: arm64
 Maintainer: Ethiquema <noreply@ethiquema.github.io>
 Depends: libc6, libjemalloc2, libqt6widgets6, libqt6gui6, libqt6core6, libqt6multimedia6, libsdl2-2.0-0, libslirp0, libarchive13t64, libzstd1
 Filename: pool/main/melonds-l4t_1.1_arm64.deb
-Size: 1544582
-MD5sum: f1674fdb269ea06b16d38fdca4f3a407
-SHA1: 4224be0ae08496d17a2f775d47ad30b598c9baf4
-SHA256: 2bd2364a9b114e4a60d122a4ecb8b153e4e5b89e72577cf8d451830a42c58b6b
+Size: 1544362
+MD5sum: 9a212a881b06dc94b1ce698d3167f4ab
+SHA1: b70fc9d730e1344d9e4a0ddf8e94ff438dc23dda
+SHA256: f3cd5676ff37ee1f5daba3d600696d47e5e86d90622f47e75bb2403835a2bb82
 Section: games
 Priority: optional
 Description: melonDS Nintendo DS Emulator (ARM64 L4T build)
@@ -3256,9 +3256,9 @@ Maintainer: Ethiquema <noreply@ethiquema.github.io>
 Depends: bash
 Filename: pool/main/setperf_1.0.0_arm64.deb
 Size: 4122
-MD5sum: 9fdd1987227ed6422f4c851ad7b15301
-SHA1: 6cb863d2f3f8f78c895e946b19c689ce6e977bdf
-SHA256: 6ae2ca0a4542494edd1133f223cf4e68e3e71090f2bbfcc5d6be62b6d984d284
+MD5sum: 33ec3de0ac898fed67564753201b96ed
+SHA1: 5b3eee91f1a526644d5a9234aa4be74e95a5b71d
+SHA256: ba92faae548859e476cfc9853e0e86464e708bcce62e181a3ab151724201dd17
 Section: utils
 Priority: optional
 Description: Nintendo Switch performance tuning wrapper
