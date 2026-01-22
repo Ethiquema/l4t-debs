@@ -3255,10 +3255,10 @@ Architecture: arm64
 Maintainer: Ethiquema <noreply@ethiquema.github.io>
 Depends: bash
 Filename: pool/main/setperf_1.0.0_arm64.deb
-Size: 4124
-MD5sum: 5c3533e1ea4371f0dc4b35d0b40d9b06
-SHA1: c1eb8c0d14335251bbfeae310c82797a095d6808
-SHA256: 3aa7741849eaf139ce1843063c1f2f1f589233223261c8308af1fbbbe96e28b7
+Size: 4120
+MD5sum: 51e22cc1981ced7cfddaede6a228ce0c
+SHA1: 5ea46aab3ce4674a88e084b77b524b1013ce5cbb
+SHA256: 024c469983b832a0ec98013cda8b86491c55be3cde5a9d23eac472a547df6865
 Section: utils
 Priority: optional
 Description: Nintendo Switch performance tuning wrapper
