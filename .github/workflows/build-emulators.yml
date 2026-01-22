@@ -1291,7 +1291,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: /tmp/qt6-citron
-          key: qt6-citron-6.8.3-v2
+          key: qt6-citron-6.8.3-v3
           restore-keys: |
             qt6-citron-
 
@@ -1471,7 +1471,7 @@ jobs:
         if: always()
         with:
           path: /tmp/qt6-citron
-          key: qt6-citron-6.8.3-v2
+          key: qt6-citron-6.8.3-v3
 
       - name: Upload artifact
         if: steps.build.outputs.completed == 'true'
