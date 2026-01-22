@@ -1287,14 +1287,24 @@ jobs:
           restore-keys: |
             ccache-citron-
 
+      - name: Restore Qt6 cache
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/qt6-citron
+          key: qt6-citron-6.7.3
+          restore-keys: |
+            qt6-citron-
+
       - name: Build Citron
         id: build
         run: |
           mkdir -p /tmp/ccache-citron
+          mkdir -p /tmp/qt6-citron
 
           docker run --rm --platform linux/arm64 \
             -v ${{ github.workspace }}:/workspace \
             -v /tmp/ccache-citron:/ccache \
+            -v /tmp/qt6-citron:/workspace/qt6 \
             -e VERSION=${{ needs.prepare.outputs.citron_version }} \
             -e CCACHE_DIR=/ccache \
             -e BUILD_TIMEOUT=${{ env.BUILD_TIMEOUT }} \
@@ -1304,6 +1314,53 @@ jobs:
               export PATH="/usr/lib/ccache:$PATH"
               export CCACHE_MAXSIZE=5G
               ccache -z
+
+              # Build Qt6 from source (Ubuntu packages lack Qt6GuiPrivate)
+              QT_VERSION="6.7.3"
+              QT_PREFIX="/workspace/qt6"
+              if [[ ! -d "$QT_PREFIX" ]]; then
+                echo "Building Qt6 $QT_VERSION from source..."
+                cd /workspace
+                wget -q https://download.qt.io/official_releases/qt/6.7/$QT_VERSION/submodules/qtbase-everywhere-src-$QT_VERSION.tar.xz
+                tar xf qtbase-everywhere-src-$QT_VERSION.tar.xz
+                cd qtbase-everywhere-src-$QT_VERSION
+                mkdir build && cd build
+                cmake .. -G Ninja \
+                  -DCMAKE_BUILD_TYPE=Release \
+                  -DCMAKE_INSTALL_PREFIX="$QT_PREFIX" \
+                  -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+                  -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+                  -DINPUT_opengl=desktop \
+                  -DINPUT_xcb=yes \
+                  -DINPUT_xkbcommon=yes \
+                  -DBUILD_SHARED_LIBS=ON \
+                  -DQT_BUILD_EXAMPLES=OFF \
+                  -DQT_BUILD_TESTS=OFF
+                ninja -j$(nproc)
+                ninja install
+                cd /workspace
+                rm -rf qtbase-everywhere-src-$QT_VERSION*
+
+                # Build qtmultimedia
+                wget -q https://download.qt.io/official_releases/qt/6.7/$QT_VERSION/submodules/qtmultimedia-everywhere-src-$QT_VERSION.tar.xz
+                tar xf qtmultimedia-everywhere-src-$QT_VERSION.tar.xz
+                cd qtmultimedia-everywhere-src-$QT_VERSION
+                mkdir build && cd build
+                cmake .. -G Ninja \
+                  -DCMAKE_BUILD_TYPE=Release \
+                  -DCMAKE_INSTALL_PREFIX="$QT_PREFIX" \
+                  -DCMAKE_PREFIX_PATH="$QT_PREFIX" \
+                  -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+                  -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+                  -DQT_BUILD_EXAMPLES=OFF \
+                  -DQT_BUILD_TESTS=OFF
+                ninja -j$(nproc)
+                ninja install
+                cd /workspace
+                rm -rf qtmultimedia-everywhere-src-$QT_VERSION*
+
+                echo "Qt6 build complete"
+              fi
 
               # Clone source from Citron Forgejo
               if [[ ! -d /workspace/src-citron ]]; then
@@ -1315,21 +1372,13 @@ jobs:
               git checkout "$VERSION"
               git submodule update --init --recursive
 
-              # Fix Qt6GuiPrivate CMake config location on Ubuntu
-              # Ubuntu puts it in Qt6Gui/ but CMake expects Qt6GuiPrivate/
-              if [[ ! -d /usr/lib/aarch64-linux-gnu/cmake/Qt6GuiPrivate ]]; then
-                mkdir -p /usr/lib/aarch64-linux-gnu/cmake/Qt6GuiPrivate
-                for f in /usr/lib/aarch64-linux-gnu/cmake/Qt6Gui/*Private*; do
-                  ln -sf "$f" /usr/lib/aarch64-linux-gnu/cmake/Qt6GuiPrivate/
-                done
-              fi
-
               mkdir -p build && cd build
 
               if [[ ! -f build.ninja ]]; then
                 cmake .. -G Ninja \
                   -DCMAKE_BUILD_TYPE=Release \
                   -DCMAKE_INSTALL_PREFIX=/usr \
+                  -DCMAKE_PREFIX_PATH="$QT_PREFIX" \
                   -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
                   -DCMAKE_C_COMPILER_LAUNCHER=ccache \
                   -DCMAKE_CXX_COMPILER=clang++ \
@@ -1358,16 +1407,26 @@ jobs:
 
               DESTDIR=/tmp/pkg ninja install
               VERSION_CLEAN=$(echo "$VERSION" | sed "s/^v//")
+
+              # Bundle Qt6 libraries
+              mkdir -p /tmp/pkg/usr/lib/citron
+              cp -a "$QT_PREFIX"/lib/*.so* /tmp/pkg/usr/lib/citron/
+
+              # Set rpath for bundled Qt6
+              patchelf --set-rpath /usr/lib/citron /tmp/pkg/usr/bin/citron 2>/dev/null || true
+              patchelf --set-rpath /usr/lib/citron /tmp/pkg/usr/bin/citron-cmd 2>/dev/null || true
+
               mkdir -p /tmp/pkg/DEBIAN
               cat > /tmp/pkg/DEBIAN/control << EOF
           Package: citron-emu-l4t
           Version: ${VERSION_CLEAN}
           Architecture: arm64
           Maintainer: Ethiquema <noreply@ethiquema.github.io>
-          Depends: libc6, libjemalloc2, libqt6widgets6, libqt6gui6, libqt6core6, libqt6multimedia6, libqt6opengl6, libsdl2-2.0-0, libssl3t64, libavcodec60, libavformat60, libswscale7, libopus0, libzstd1, libusb-1.0-0, libva2, liblz4-1
+          Depends: libc6, libjemalloc2, libsdl2-2.0-0, libssl3t64, libavcodec60, libavformat60, libswscale7, libopus0, libzstd1, libusb-1.0-0, libva2, liblz4-1, libxcb1, libxkbcommon0, libxkbcommon-x11-0, libegl1, libgl1
           Section: games
           Priority: optional
           Description: Citron Nintendo Switch Emulator (ARM64 L4T build)
+           Includes bundled Qt6 libraries.
           EOF
               dpkg-deb --build /tmp/pkg /workspace/citron-emu-l4t_${VERSION_CLEAN}_arm64.deb
 
@@ -1387,6 +1446,13 @@ jobs:
         with:
           path: /tmp/ccache-citron
           key: ccache-citron-${{ needs.prepare.outputs.citron_version }}-${{ github.run_id }}
+
+      - name: Save Qt6 cache
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: /tmp/qt6-citron
+          key: qt6-citron-6.7.3
 
       - name: Upload artifact
         if: steps.build.outputs.completed == 'true'
