@@ -1292,7 +1292,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: /tmp/qt6-citron
-          key: qt6-citron-6.8.3-v3
+          key: qt6-citron-6.8.3-v4
           restore-keys: |
             qt6-citron-
 
@@ -1322,7 +1322,8 @@ jobs:
               QT_VERSION="6.8.3"
               QT_MAJOR="6.8"
               QT_PREFIX="/workspace/qt6"
-              if [[ ! -f "$QT_PREFIX/lib/libQt6Core.so" ]]; then
+              # Check all 3 modules are present (Core, ShaderTools, Multimedia)
+              if [[ ! -f "$QT_PREFIX/lib/libQt6Multimedia.so" || ! -f "$QT_PREFIX/lib/libQt6Core.so" ]]; then
                 echo "Building Qt6 $QT_VERSION from source..."
                 cd /workspace
                 wget -q https://download.qt.io/official_releases/qt/$QT_MAJOR/$QT_VERSION/submodules/qtbase-everywhere-src-$QT_VERSION.tar.xz
@@ -1474,7 +1475,7 @@ jobs:
         if: always()
         with:
           path: /tmp/qt6-citron
-          key: qt6-citron-6.8.3-v3
+          key: qt6-citron-6.8.3-v4
 
       - name: Upload artifact
         if: steps.build.outputs.completed == 'true'
