@@ -1292,7 +1292,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: /tmp/qt6-citron
-          key: qt6-citron-6.8.3-v4
+          key: qt6-citron-6.8.3-v5
           restore-keys: |
             qt6-citron-
 
@@ -1322,8 +1322,9 @@ jobs:
               QT_VERSION="6.8.3"
               QT_MAJOR="6.8"
               QT_PREFIX="/workspace/qt6"
-              # Check all 3 modules are present (Core, ShaderTools, Multimedia)
-              if [[ ! -f "$QT_PREFIX/lib/libQt6Multimedia.so" || ! -f "$QT_PREFIX/lib/libQt6Core.so" ]]; then
+              export PKG_CONFIG_PATH="/usr/lib/aarch64-linux-gnu/pkgconfig:$PKG_CONFIG_PATH"
+              # Check all 3 modules + cmake configs are present
+              if [[ ! -f "$QT_PREFIX/lib/libQt6Multimedia.so" || ! -f "$QT_PREFIX/lib/libQt6Core.so" || ! -d "$QT_PREFIX/lib/cmake/Qt6Multimedia" ]]; then
                 echo "Building Qt6 $QT_VERSION from source..."
                 cd /workspace
                 wget -q https://download.qt.io/official_releases/qt/$QT_MAJOR/$QT_VERSION/submodules/qtbase-everywhere-src-$QT_VERSION.tar.xz
@@ -1335,6 +1336,8 @@ jobs:
                   -DCMAKE_INSTALL_PREFIX="$QT_PREFIX" \
                   -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
                   -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+                  -DFEATURE_opengl=ON \
+                  -DFEATURE_opengl_desktop=ON \
                   -DINPUT_opengl=desktop \
                   -DINPUT_xcb=yes \
                   -DINPUT_xkbcommon=yes \
@@ -1475,7 +1478,7 @@ jobs:
         if: always()
         with:
           path: /tmp/qt6-citron
-          key: qt6-citron-6.8.3-v4
+          key: qt6-citron-6.8.3-v5
 
       - name: Upload artifact
         if: steps.build.outputs.completed == 'true'
