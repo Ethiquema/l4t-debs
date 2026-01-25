@@ -194,17 +194,17 @@ Description: APT configuration snippet to enable large HiDPI icon downloads
  decide to fetch them on-demand from a web location.
 
 Package: azahar-emu-l4t
-Version: 2124.1
+Version: 2124.2
 Architecture: arm64
 Maintainer: Ethiquema <noreply@ethiquema.github.io>
 Depends: libc6, libjemalloc2, libqt6widgets6, libqt6gui6, libqt6core6, libqt6multimedia6, libqt6opengl6, libsdl2-2.0-0, libssl3t64, libavcodec60, libavformat60, libswscale7, libspeexdsp1, libfmt9, libzstd1, libusb-1.0-0, libhidapi-hidraw0, libboost-serialization1.83.0, libenet7, liblz4-1
 Replaces: citra
 Provides: citra
-Filename: pool/main/azahar-emu-l4t_2124.1_arm64.deb
-Size: 11492070
-MD5sum: afbf83f5c94a1ce8296f79e72e995f2b
-SHA1: 0ee43b0fabcdb741d12afaf884661792ec38e1e2
-SHA256: 50b395d3350e3f3948d9fe45706c135aff47db046678f7c6476502236536bb2e
+Filename: pool/main/azahar-emu-l4t_2124.2_arm64.deb
+Size: 11520574
+MD5sum: b0df8e9cac45bdaeb8f5538f8a5f03be
+SHA1: ed158898bd26b9ae913cb54904cb8c82bd52fd6e
+SHA256: bfd23bd79e671978d0e386ea63ce98e8f1dd7606b173160365ac308dc09b7a68
 Section: games
 Priority: optional
 Description: Azahar 3DS Emulator (ARM64 L4T build)
@@ -319,15 +319,15 @@ Description: CUDA licenses
  Contains the license agreements (EULA) required for using the CUDA tools.
 
 Package: dolphin-emu-l4t
-Version: 0.0.0+git.3221e98
+Version: 0.0.0+git.cdbea88
 Architecture: arm64
 Maintainer: Ethiquema <noreply@ethiquema.github.io>
 Depends: libc6, libjemalloc2, libqt6widgets6, libqt6gui6, libqt6core6, libavcodec60, libavformat60, libswscale7, libevdev2, libminiupnpc17, libmbedtls21, libcurl4t64, libhidapi-hidraw0, libsystemd0, libbluetooth3, libasound2t64, libpulse0, libpugixml1v5, libbz2-1.0, libzstd1, liblzo2-2, libpng16-16t64, libusb-1.0-0, libfmt9, libsfml-system2.6, libsfml-network2.6, libxxhash0, libspng0
-Filename: pool/main/dolphin-emu-l4t_0.0.0+git.3221e98_arm64.deb
-Size: 38701410
-MD5sum: ad32fd07836090ede4282271427d7f49
-SHA1: 9ca5a34426d82b8ddf3e5381802cc0fe6e1fa947
-SHA256: b55a20622bdc25121cb07611f0741483a231b3cc7d3c8830340d5d2c5323888d
+Filename: pool/main/dolphin-emu-l4t_0.0.0+git.cdbea88_arm64.deb
+Size: 38716092
+MD5sum: dce20e048d96eed69f90296898bea6dc
+SHA1: 36814ab89b358122ed5762bd69edbe3802f12f0a
+SHA256: 64bde27a76f42f139e39168cf537cf2af59bbae6ffc5b0360a4c245160c9f4de
 Section: games
 Priority: optional
 Description: Dolphin GameCube/Wii Emulator (ARM64 L4T build)
@@ -3272,9 +3272,9 @@ Maintainer: Ethiquema <noreply@ethiquema.github.io>
 Depends: bash
 Filename: pool/main/setperf_1.0.0_arm64.deb
 Size: 4122
-MD5sum: faf1cda5c208a4f76f6fb868683dd19c
-SHA1: 13b2baa3aae0d43634dd32cce5ca8e270d4f5f10
-SHA256: e131cdfa67fcbecd4a93967334b190509cf7848ce81fbf84b3d16bc6ac81e25c
+MD5sum: eed88154eb1ea5012b09f3a5f765c8c6
+SHA1: 746b2eb9f1de1709077cabc853ffef922a433b40
+SHA256: 448b0b0ff6362ff4a6f6b90592b59128501b886cde084100a1cd0875031ed963
 Section: utils
 Priority: optional
 Description: Nintendo Switch performance tuning wrapper
