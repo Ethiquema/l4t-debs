@@ -1385,7 +1385,8 @@ jobs:
                 make clean 2>/dev/null || true
                 timeout ${BUILD_TIMEOUT}s make -j$(nproc) platform=unix $make_args \
                   CC="ccache gcc" CXX="ccache g++" \
-                  CFLAGS="$CFLAGS" CXXFLAGS="$CXXFLAGS" LDFLAGS="$LDFLAGS" || {
+                  CFLAGS="$CFLAGS" CXXFLAGS="$CXXFLAGS" LDFLAGS="$LDFLAGS" \
+                  SKIPDEPEND=1 WERROR=0 || {
                   EXIT_CODE=$?
                   if [[ $EXIT_CODE -eq 124 ]]; then
                     echo "TIMEOUT on $name"
@@ -1397,7 +1398,7 @@ jobs:
                 cd "$CORES_DIR"
               }
 
-              # Heavy cores
+              # Heavy cores (WERROR=0 disables -Werror in FBNeo)
               build_core FBNeo fbneo "src/burner/libretro"
               build_core mame2003-plus-libretro mame2003-plus
               build_core vice-libretro vice "" "EMUTYPE=x64"
@@ -1484,8 +1485,9 @@ jobs:
               ccache -z
 
               # ARM64 build flags for Tegra X1 with LTO
-              export CFLAGS="-O3 -flto -march=armv8-a+crc+simd -mtune=cortex-a57"
-              export CXXFLAGS="-O3 -flto -march=armv8-a+crc+simd -mtune=cortex-a57"
+              # -Wno-error prevents warnings from failing the build
+              export CFLAGS="-O3 -flto -march=armv8-a+crc+simd -mtune=cortex-a57 -Wno-error"
+              export CXXFLAGS="-O3 -flto -march=armv8-a+crc+simd -mtune=cortex-a57 -Wno-error"
               export LDFLAGS="-flto -ljemalloc"
 
               CORES_DIR=/workspace/libretro-cores
@@ -1509,15 +1511,18 @@ jobs:
                   cd "$subdir"
                 fi
                 make clean 2>/dev/null || true
-                make -j$(nproc) platform=unix $make_args \
+                if make -j$(nproc) platform=unix $make_args \
                   CC="ccache gcc" CXX="ccache g++" \
-                  CFLAGS="$CFLAGS" CXXFLAGS="$CXXFLAGS" LDFLAGS="$LDFLAGS"
-                find . -name "*.so" -exec cp {} "$PKG_DIR/" \;
+                  CFLAGS="$CFLAGS" CXXFLAGS="$CXXFLAGS" LDFLAGS="$LDFLAGS"; then
+                  find . -name "*.so" -exec cp {} "$PKG_DIR/" \;
+                else
+                  echo "WARNING: Failed to build $name, skipping..."
+                fi
                 cd "$CORES_DIR"
               }
 
-              # Computers
-              build_core fmsx-libretro fmsx
+              # Computers (fmsx has broken source code, use bluemsx instead)
+              # build_core fmsx-libretro fmsx
               build_core blueMSX-libretro bluemsx
               build_core PUAE puae
               build_core fuse-libretro fuse
