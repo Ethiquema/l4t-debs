@@ -536,8 +536,81 @@ jobs:
               ref: 'main'
             });
 
-  build-duckstation:
+  # DuckStation dependencies (Qt6, SDL3, etc.) - built separately for caching
+  build-duckstation-deps:
     needs: prepare
+    if: needs.prepare.outputs.build_duckstation == 'true'
+    runs-on: ubuntu-24.04
+    outputs:
+      deps_ready: ${{ steps.check.outputs.deps_ready }}
+    steps:
+      - name: Check if deps already cached
+        id: cache-check
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/duck-deps
+          key: duck-deps-v2
+          lookup-only: true
+
+      - name: Set up QEMU
+        if: steps.cache-check.outputs.cache-hit != 'true'
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Restore cached image
+        if: steps.cache-check.outputs.cache-hit != 'true'
+        uses: actions/cache@v4
+        with:
+          path: /tmp/emu-deps.tar
+          key: ${{ env.CACHE_KEY }}
+
+      - name: Load image
+        if: steps.cache-check.outputs.cache-hit != 'true'
+        run: docker load -i /tmp/emu-deps.tar
+
+      - name: Build DuckStation dependencies
+        id: build-deps
+        if: steps.cache-check.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p /tmp/duck-deps
+
+          docker run --rm --platform linux/arm64 \
+            -v ${{ github.workspace }}:/workspace \
+            -v /tmp/duck-deps:/deps \
+            -e COMMIT=${{ needs.prepare.outputs.duck_commit }} \
+            emu-deps-image bash -c '
+              set -e
+
+              # Clone source
+              git clone --depth 1 https://github.com/stenzek/duckstation.git /workspace/src-duck
+              cd /workspace/src-duck
+              git fetch --depth 1 origin "$COMMIT"
+              git checkout "$COMMIT"
+
+              # Build dependencies with official script
+              echo "Building dependencies with official script..."
+              # Remove -system-harfbuzz to use bundled version
+              sed -i "s/-system-harfbuzz//" scripts/deps/build-dependencies-linux.sh
+              scripts/deps/build-dependencies-linux.sh /deps
+
+              echo "Dependencies built successfully"
+            '
+
+      - name: Save deps cache
+        if: steps.cache-check.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: /tmp/duck-deps
+          key: duck-deps-v2
+
+      - name: Check deps status
+        id: check
+        run: echo "deps_ready=true" >> $GITHUB_OUTPUT
+
+  # DuckStation build (uses pre-built dependencies)
+  build-duckstation:
+    needs: [prepare, build-duckstation-deps]
     if: needs.prepare.outputs.build_duckstation == 'true'
     runs-on: ubuntu-24.04
     outputs:
@@ -569,15 +642,12 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: /tmp/duck-deps
-          key: duck-deps-v1
-          restore-keys: |
-            duck-deps-
+          key: duck-deps-v2
 
       - name: Build DuckStation
         id: build
         run: |
           mkdir -p /tmp/ccache-duck
-          mkdir -p /tmp/duck-deps
 
           docker run --rm --platform linux/arm64 \
             -v ${{ github.workspace }}:/workspace \
@@ -603,17 +673,6 @@ jobs:
               git fetch origin
               git checkout "$COMMIT"
               git submodule update --init --recursive
-
-              # Use official dependency build script (builds all deps to exact versions)
-              # Deps are cached in /deps mount
-              if [[ ! -f /deps/lib/libQt6Core.so ]]; then
-                echo "Building dependencies with official script..."
-                # Remove -system-harfbuzz to use bundled version (system has incompatible version)
-                sed -i "s/-system-harfbuzz//" scripts/deps/build-dependencies-linux.sh
-                scripts/deps/build-dependencies-linux.sh /deps
-              else
-                echo "Using cached dependencies"
-              fi
 
               mkdir -p build && cd build
 
@@ -686,13 +745,6 @@ jobs:
         with:
           path: /tmp/ccache-duck
           key: ccache-duck-${{ needs.prepare.outputs.duck_short }}-${{ github.run_id }}
-
-      - name: Save deps cache
-        uses: actions/cache/save@v4
-        if: always()
-        with:
-          path: /tmp/duck-deps
-          key: duck-deps-v1
 
       - name: Upload artifact
         if: steps.build.outputs.completed == 'true'
