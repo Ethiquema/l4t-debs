@@ -1261,6 +1261,314 @@ jobs:
               ref: 'main'
             });
 
+  # Libretro cores - Job 1: Heavy cores (FBNeo, MAME, VICE, DOSBox)
+  build-libretro-heavy:
+    needs: prepare
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Restore cached image
+        uses: actions/cache@v4
+        with:
+          path: /tmp/emu-deps.tar
+          key: ${{ env.CACHE_KEY }}
+
+      - name: Load image
+        run: docker load -i /tmp/emu-deps.tar
+
+      - name: Restore ccache
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/ccache-libretro-heavy
+          key: ccache-libretro-heavy-v1
+          restore-keys: |
+            ccache-libretro-heavy-
+
+      - name: Build heavy Libretro cores
+        id: build
+        run: |
+          mkdir -p /tmp/ccache-libretro-heavy
+
+          docker run --rm --platform linux/arm64 \
+            -v ${{ github.workspace }}:/workspace \
+            -v /tmp/ccache-libretro-heavy:/ccache \
+            -e CCACHE_DIR=/ccache \
+            -e BUILD_TIMEOUT=${{ env.BUILD_TIMEOUT }} \
+            emu-deps-image bash -c '
+              set -e
+
+              export PATH="/usr/lib/ccache:$PATH"
+              export CCACHE_MAXSIZE=5G
+              ccache -z
+
+              # ARM64 build flags for Tegra X1 with LTO
+              export CFLAGS="-O3 -flto -march=armv8-a+crc+simd -mtune=cortex-a57"
+              export CXXFLAGS="-O3 -flto -march=armv8-a+crc+simd -mtune=cortex-a57"
+              export LDFLAGS="-flto -ljemalloc"
+
+              CORES_DIR=/workspace/libretro-cores
+              PKG_DIR=/workspace/cores-heavy
+              mkdir -p "$CORES_DIR" "$PKG_DIR"
+
+              cd "$CORES_DIR"
+
+              build_core() {
+                local repo=$1
+                local name=$2
+                local subdir=${3:-}
+                local make_args=${4:-}
+
+                echo "=== Building $name ==="
+                if [[ ! -d "$name" ]]; then
+                  git clone --depth 1 "https://github.com/libretro/$repo.git" "$name"
+                fi
+                cd "$name"
+                if [[ -n "$subdir" ]]; then
+                  cd "$subdir"
+                fi
+                make clean 2>/dev/null || true
+                timeout ${BUILD_TIMEOUT}s make -j$(nproc) platform=unix $make_args \
+                  CC="ccache gcc" CXX="ccache g++" \
+                  CFLAGS="$CFLAGS" CXXFLAGS="$CXXFLAGS" LDFLAGS="$LDFLAGS" || {
+                  EXIT_CODE=$?
+                  if [[ $EXIT_CODE -eq 124 ]]; then
+                    echo "TIMEOUT on $name"
+                    exit 124
+                  fi
+                  exit $EXIT_CODE
+                }
+                find . -name "*.so" -exec cp {} "$PKG_DIR/" \;
+                cd "$CORES_DIR"
+              }
+
+              # Heavy cores
+              build_core FBNeo fbneo "src/burner/libretro"
+              build_core mame2003-plus-libretro mame2003-plus
+              build_core vice-libretro vice "" "EMUTYPE=x64"
+              build_core dosbox-pure dosbox-pure
+
+              ccache -s
+              echo "completed" > /workspace/build-status-heavy
+            '
+
+          if [[ -f build-status-heavy ]] && [[ "$(cat build-status-heavy)" == "completed" ]]; then
+            echo "completed=true" >> $GITHUB_OUTPUT
+          else
+            echo "completed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Save ccache
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: /tmp/ccache-libretro-heavy
+          key: ccache-libretro-heavy-v1-${{ github.run_id }}
+
+      - name: Upload cores
+        if: steps.build.outputs.completed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: libretro-cores-heavy
+          path: "cores-heavy/*.so"
+          retention-days: 1
+
+      - name: Trigger retry if timeout
+        if: steps.build.outputs.completed == 'false'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'build-emulators.yml',
+              ref: 'main'
+            });
+
+  # Libretro cores - Job 2: Light cores (computers, misc consoles)
+  build-libretro-light:
+    needs: prepare
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Restore cached image
+        uses: actions/cache@v4
+        with:
+          path: /tmp/emu-deps.tar
+          key: ${{ env.CACHE_KEY }}
+
+      - name: Load image
+        run: docker load -i /tmp/emu-deps.tar
+
+      - name: Restore ccache
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/ccache-libretro-light
+          key: ccache-libretro-light-v1
+          restore-keys: |
+            ccache-libretro-light-
+
+      - name: Build light Libretro cores
+        id: build
+        run: |
+          mkdir -p /tmp/ccache-libretro-light
+
+          docker run --rm --platform linux/arm64 \
+            -v ${{ github.workspace }}:/workspace \
+            -v /tmp/ccache-libretro-light:/ccache \
+            -e CCACHE_DIR=/ccache \
+            emu-deps-image bash -c '
+              set -e
+
+              export PATH="/usr/lib/ccache:$PATH"
+              export CCACHE_MAXSIZE=5G
+              ccache -z
+
+              # ARM64 build flags for Tegra X1 with LTO
+              export CFLAGS="-O3 -flto -march=armv8-a+crc+simd -mtune=cortex-a57"
+              export CXXFLAGS="-O3 -flto -march=armv8-a+crc+simd -mtune=cortex-a57"
+              export LDFLAGS="-flto -ljemalloc"
+
+              CORES_DIR=/workspace/libretro-cores
+              PKG_DIR=/workspace/cores-light
+              mkdir -p "$CORES_DIR" "$PKG_DIR"
+
+              cd "$CORES_DIR"
+
+              build_core() {
+                local repo=$1
+                local name=$2
+                local subdir=${3:-}
+                local make_args=${4:-}
+
+                echo "=== Building $name ==="
+                if [[ ! -d "$name" ]]; then
+                  git clone --depth 1 "https://github.com/libretro/$repo.git" "$name"
+                fi
+                cd "$name"
+                if [[ -n "$subdir" ]]; then
+                  cd "$subdir"
+                fi
+                make clean 2>/dev/null || true
+                make -j$(nproc) platform=unix $make_args \
+                  CC="ccache gcc" CXX="ccache g++" \
+                  CFLAGS="$CFLAGS" CXXFLAGS="$CXXFLAGS" LDFLAGS="$LDFLAGS"
+                find . -name "*.so" -exec cp {} "$PKG_DIR/" \;
+                cd "$CORES_DIR"
+              }
+
+              # Computers
+              build_core fmsx-libretro fmsx
+              build_core blueMSX-libretro bluemsx
+              build_core PUAE puae
+              build_core fuse-libretro fuse
+              build_core libretro-cap32 cap32
+              build_core libretro-atari800 atari800
+              build_core px68k-libretro px68k
+              build_core quasi88-libretro quasi88
+
+              # Consoles
+              build_core opera-libretro opera
+              build_core neocd_libretro neocd
+              build_core virtualjaguar-libretro virtualjaguar
+              build_core libretro-o2em o2em
+              build_core libretro-vecx vecx
+              build_core FreeChaF freechaf
+              build_core FreeIntv freeintv
+              build_core geolith-libretro geolith
+
+              # Games
+              build_core libretro-prboom prboom
+              build_core nxengine-libretro nxengine
+
+              ccache -s
+              echo "completed" > /workspace/build-status-light
+            '
+
+          if [[ -f build-status-light ]] && [[ "$(cat build-status-light)" == "completed" ]]; then
+            echo "completed=true" >> $GITHUB_OUTPUT
+          else
+            echo "completed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Save ccache
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: /tmp/ccache-libretro-light
+          key: ccache-libretro-light-v1-${{ github.run_id }}
+
+      - name: Upload cores
+        if: steps.build.outputs.completed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: libretro-cores-light
+          path: "cores-light/*.so"
+          retention-days: 1
+
+  # Package all libretro cores into single deb
+  build-libretro-package:
+    needs: [build-libretro-heavy, build-libretro-light]
+    if: always() && (needs.build-libretro-heavy.result == 'success' || needs.build-libretro-light.result == 'success')
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Download heavy cores
+        uses: actions/download-artifact@v4
+        with:
+          name: libretro-cores-heavy
+          path: cores/
+        continue-on-error: true
+
+      - name: Download light cores
+        uses: actions/download-artifact@v4
+        with:
+          name: libretro-cores-light
+          path: cores/
+        continue-on-error: true
+
+      - name: Create package
+        id: package
+        run: |
+          if ls cores/*.so 1>/dev/null 2>&1; then
+            mkdir -p pkg/usr/lib/libretro pkg/DEBIAN
+            cp cores/*.so pkg/usr/lib/libretro/
+
+            cat > pkg/DEBIAN/control << 'EOF'
+          Package: libretro-cores-l4t
+          Version: 1.0.0
+          Architecture: arm64
+          Maintainer: Ethiquema <noreply@ethiquema.github.io>
+          Depends: libc6, zlib1g, libjemalloc2
+          Section: games
+          Priority: optional
+          Description: Additional Libretro cores (ARM64 L4T build)
+           FBNeo, VICE, DOSBox Pure, fMSX, blueMSX, PUAE, Fuse, Cap32,
+           Atari800, PX68k, Quasi88, Opera, NeoCD, Virtual Jaguar, O2EM,
+           VecX, FreeChaF, FreeIntv, Geolith, PrBoom, NXEngine, MAME 2003+
+          EOF
+
+            dpkg-deb --build pkg libretro-cores-l4t_1.0.0_arm64.deb
+            echo "has_deb=true" >> $GITHUB_OUTPUT
+          else
+            echo "No cores found"
+            echo "has_deb=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Upload artifact
+        if: steps.package.outputs.has_deb == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: deb-libretro-cores
+          path: "*.deb"
+          retention-days: 1
+
   build-setperf:
     runs-on: ubuntu-24.04
     steps:
@@ -1286,7 +1594,7 @@ jobs:
   # UPDATE REPO: Collect all debs and update APT repository
   # ===========================================================================
   update-repo:
-    needs: [prepare, build-azahar, build-dolphin, build-duckstation, build-esde, build-melonds, build-ppsspp, build-xemu, build-setperf]
+    needs: [prepare, build-azahar, build-dolphin, build-duckstation, build-esde, build-melonds, build-ppsspp, build-xemu, build-libretro-package, build-setperf]
     if: always()
     runs-on: ubuntu-24.04
     steps:
