@@ -356,10 +356,10 @@ Depends: libc6, libsdl2-2.0-0, libavcodec60, libavformat60, libswscale7, libfree
 Conflicts: emulationstation
 Provides: emulationstation
 Filename: pool/main/emulationstation-de-l4t_3.4.0_arm64.deb
-Size: 45204568
-MD5sum: 9b64ab34bee0ed91729f2b9e4dbeb151
-SHA1: 4c930bd9f63c13090c16171456a4c0e35a770101
-SHA256: 0fab1a01437a2fc8f6030a78eca12d7a9124806f1baf832cc839c40c4f7e9699
+Size: 45204322
+MD5sum: 668ae2a42ef73170733e60090cfacee5
+SHA1: 2357f88775f7f2a78f7737de5f4725c9e4a43964
+SHA256: a61078e647ad417b34a5ddfcf52ba871ec952d5a782ff34b7ff04332aab563ef
 Section: games
 Priority: optional
 Description: EmulationStation Desktop Edition (ARM64 L4T build)
@@ -2081,10 +2081,10 @@ Architecture: arm64
 Maintainer: Ethiquema <noreply@ethiquema.github.io>
 Depends: libc6, zlib1g, libjemalloc2
 Filename: pool/main/libretro-cores-l4t_1.0.0_arm64.deb
-Size: 504436
-MD5sum: 50398fe6b27040d20dbcdf585270baf5
-SHA1: 7134f1aaeec1665cfa02fe1b7e460db584c7466f
-SHA256: 7e822e6d3e190f5c87de9d9ee6724ee7c27d1b08cc575543debf99667734fdab
+Size: 504426
+MD5sum: 3cb9a9728ae697a0adb2ef023285e088
+SHA1: 4de7aafd767cb8cee6d6fbaa101fc5ffd1fcc24b
+SHA256: cd2d6337215865174fc73bbe5d6be580bc69e9c6dee1e40ac116d38fc8de10e6
 Section: games
 Priority: optional
 Description: Additional Libretro cores (ARM64 L4T build)
@@ -2655,10 +2655,10 @@ Architecture: arm64
 Maintainer: Ethiquema <noreply@ethiquema.github.io>
 Depends: libc6, libjemalloc2, libqt6widgets6, libqt6gui6, libqt6core6, libqt6multimedia6, libsdl2-2.0-0, libslirp0, libarchive13t64, libzstd1
 Filename: pool/main/melonds-l4t_1.1_arm64.deb
-Size: 1544492
-MD5sum: 5db647c1a1a26b5b599fc621bef2bc12
-SHA1: d9eda1bb55e136cf2e5244c239972e60e90ef062
-SHA256: 18caa904c1607a80b7e2bab7075c7cd49343d51f59cf5d4a4957a3b4a377a963
+Size: 1544556
+MD5sum: 20c925707ef6c3dd7f5738d469421b63
+SHA1: b877cca12530e57ae2ae57386e3ae7adb6b7505e
+SHA256: 568ef7fcc5445a523343048957451df3a7a93b0c5c5787fff73fb273c83c5a78
 Section: games
 Priority: optional
 Description: melonDS Nintendo DS Emulator (ARM64 L4T build)
@@ -3254,9 +3254,9 @@ Conflicts: ppsspp
 Provides: ppsspp
 Filename: pool/main/ppsspp-l4t_1.19.3_arm64.deb
 Size: 21566852
-MD5sum: 6b2c5cb90028d20b0eb5156d256f2f5b
-SHA1: 83a24ae16a2344bb9985c61484dcc29aeaf4c6c6
-SHA256: 4116e20c7a7f5c1f65d20876ff7bb8ee6badd573d959ff776f1a8c3d5ebcb36f
+MD5sum: 037563785c60e82a50b27b90d7076dd5
+SHA1: 5bf396d3b30ad8436643a18b25caba6c9e42a02e
+SHA256: dc63f37471a293ee41f6ff0244e97388f7e013c671baefbfc0ca2652e86989c7
 Section: games
 Priority: optional
 Description: PPSSPP PlayStation Portable Emulator (ARM64 L4T build)
@@ -3289,9 +3289,9 @@ Maintainer: Ethiquema <noreply@ethiquema.github.io>
 Depends: bash
 Filename: pool/main/setperf_1.0.0_arm64.deb
 Size: 4122
-MD5sum: cb89fe79b21a59ac241c61e9b95daf95
-SHA1: 1df1e1e5aa6123eb4ab5c4c5b243608a6e8f7999
-SHA256: ba2f7b0b3ffe075499c99fa7e1b181e2928fa2f14905b01d933e5a57b606ee0d
+MD5sum: e438b0c6e64fd8933381e86db7773c6b
+SHA1: 417307ffca410a0d966c497fd7c9c62d184b2a52
+SHA256: c52f02f9e5bd57e74a0d6601580f5d3a180a105259d0960f5d1ad22296b5b08c
 Section: utils
 Priority: optional
 Description: Nintendo Switch performance tuning wrapper
