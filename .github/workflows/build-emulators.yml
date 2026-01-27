@@ -887,14 +887,28 @@ jobs:
                 exit $EXIT_CODE
               }
 
-              DESTDIR=/tmp/pkg ninja install
+              # DuckStation has no install target, copy manually
+              mkdir -p /tmp/pkg/usr/bin /tmp/pkg/usr/lib/duckstation /tmp/pkg/usr/share/applications
+
+              cp bin/duckstation-qt /tmp/pkg/usr/bin/
+              cp -r bin/resources /tmp/pkg/usr/lib/duckstation/ 2>/dev/null || true
 
               # Bundle the custom-built libraries
-              mkdir -p /tmp/pkg/usr/lib/duckstation
               cp /deps/lib/*.so* /tmp/pkg/usr/lib/duckstation/ 2>/dev/null || true
 
               # Set rpath for bundled libs
               patchelf --set-rpath /usr/lib/duckstation /tmp/pkg/usr/bin/duckstation-qt 2>/dev/null || true
+
+              cat > /tmp/pkg/usr/share/applications/duckstation.desktop << DESK
+          [Desktop Entry]
+          Name=DuckStation
+          Comment=PlayStation 1 Emulator
+          Exec=duckstation-qt
+          Icon=duckstation
+          Terminal=false
+          Type=Application
+          Categories=Game;Emulator;
+          DESK
 
               PKG_VERSION="0.0.0+git.${SHORT}"
               mkdir -p /tmp/pkg/DEBIAN
