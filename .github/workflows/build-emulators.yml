@@ -1603,72 +1603,75 @@ jobs:
         run: |
           mkdir -p /tmp/ccache-libretro-heavy
 
+          cat > /tmp/build-heavy.sh << 'SCRIPT'
+          set -e
+
+          export PATH="/usr/lib/ccache:$PATH"
+          export CCACHE_MAXSIZE=5G
+          ccache -z
+
+          # ARM64 build flags for Tegra X1 with LTO
+          export CFLAGS="-O3 -flto -march=armv8-a+crc+simd -mtune=cortex-a57"
+          export CXXFLAGS="-O3 -flto -march=armv8-a+crc+simd -mtune=cortex-a57"
+          export LDFLAGS="-flto -ljemalloc"
+
+          CORES_DIR=/workspace/libretro-cores
+          PKG_DIR=/workspace/cores-heavy
+          mkdir -p "$CORES_DIR" "$PKG_DIR"
+
+          cd "$CORES_DIR"
+
+          build_core() {
+            local repo=$1
+            local name=$2
+            local subdir=${3:-}
+            local make_args=${4:-}
+
+            echo "=== Building $name ==="
+            if [[ -d "$name" ]] && [[ -f "$name/.gitmodules" ]] && [[ -z "$(ls -A "$name/libretro-common" 2>/dev/null)" ]]; then
+              echo "Submodules missing in cached $name, re-cloning..."
+              rm -rf "$name"
+            fi
+            if [[ ! -d "$name" ]]; then
+              git clone --depth 1 --recursive "https://github.com/libretro/$repo.git" "$name"
+            fi
+            cd "$name"
+            if [[ -n "$subdir" ]]; then
+              cd "$subdir"
+            fi
+            make clean 2>/dev/null || true
+            # Don't pass CFLAGS/CXXFLAGS as make args (overrides Makefile include paths)
+            # They are already exported as env vars, Makefiles will append to them
+            timeout ${BUILD_TIMEOUT}s make -j$(nproc) platform=unix $make_args \
+              CC="ccache gcc" CXX="ccache g++" \
+              LDFLAGS="$LDFLAGS" SKIPDEPEND=1 WERROR=0 || {
+              EXIT_CODE=$?
+              if [[ $EXIT_CODE -eq 124 ]]; then
+                echo "TIMEOUT on $name"
+                exit 124
+              fi
+              exit $EXIT_CODE
+            }
+            find . -name "*.so" -exec cp {} "$PKG_DIR/" \;
+            cd "$CORES_DIR"
+          }
+
+          # Heavy cores
+          build_core mame2003-plus-libretro mame2003-plus
+          build_core vice-libretro vice "" "EMUTYPE=x64"
+          build_core dosbox-pure dosbox-pure
+
+          ccache -s
+          echo "completed" > /workspace/build-status-heavy
+          SCRIPT
+
           docker run --rm --platform linux/arm64 \
             -v ${{ github.workspace }}:/workspace \
             -v /tmp/ccache-libretro-heavy:/ccache \
+            -v /tmp/build-heavy.sh:/build.sh:ro \
             -e CCACHE_DIR=/ccache \
             -e BUILD_TIMEOUT=${{ env.BUILD_TIMEOUT }} \
-            emu-deps-image bash -c '
-              set -e
-
-              export PATH="/usr/lib/ccache:$PATH"
-              export CCACHE_MAXSIZE=5G
-              ccache -z
-
-              # ARM64 build flags for Tegra X1 with LTO
-              export CFLAGS="-O3 -flto -march=armv8-a+crc+simd -mtune=cortex-a57"
-              export CXXFLAGS="-O3 -flto -march=armv8-a+crc+simd -mtune=cortex-a57"
-              export LDFLAGS="-flto -ljemalloc"
-
-              CORES_DIR=/workspace/libretro-cores
-              PKG_DIR=/workspace/cores-heavy
-              mkdir -p "$CORES_DIR" "$PKG_DIR"
-
-              cd "$CORES_DIR"
-
-              build_core() {
-                local repo=$1
-                local name=$2
-                local subdir=${3:-}
-                local make_args=${4:-}
-
-                echo "=== Building $name ==="
-                if [[ -d "$name" ]] && [[ -f "$name/.gitmodules" ]] && [[ -z "$(ls -A "$name/libretro-common" 2>/dev/null)" ]]; then
-                  echo "Submodules missing in cached $name, re-cloning..."
-                  rm -rf "$name"
-                fi
-                if [[ ! -d "$name" ]]; then
-                  git clone --depth 1 --recursive "https://github.com/libretro/$repo.git" "$name"
-                fi
-                cd "$name"
-                if [[ -n "$subdir" ]]; then
-                  cd "$subdir"
-                fi
-                make clean 2>/dev/null || true
-                # Don't pass CFLAGS/CXXFLAGS as make args (overrides Makefile include paths)
-                # They are already exported as env vars, Makefiles will append to them
-                timeout ${BUILD_TIMEOUT}s make -j$(nproc) platform=unix $make_args \
-                  CC="ccache gcc" CXX="ccache g++" \
-                  LDFLAGS="$LDFLAGS" SKIPDEPEND=1 WERROR=0 || {
-                  EXIT_CODE=$?
-                  if [[ $EXIT_CODE -eq 124 ]]; then
-                    echo "TIMEOUT on $name"
-                    exit 124
-                  fi
-                  exit $EXIT_CODE
-                }
-                find . -name "*.so" -exec cp {} "$PKG_DIR/" \;
-                cd "$CORES_DIR"
-              }
-
-              # Heavy cores
-              build_core mame2003-plus-libretro mame2003-plus
-              build_core vice-libretro vice "" "EMUTYPE=x64"
-              build_core dosbox-pure dosbox-pure
-
-              ccache -s
-              echo "completed" > /workspace/build-status-heavy
-            '
+            emu-deps-image bash /build.sh
 
           if [[ -f build-status-heavy ]] && [[ "$(cat build-status-heavy)" == "completed" ]]; then
             echo "completed=true" >> $GITHUB_OUTPUT
