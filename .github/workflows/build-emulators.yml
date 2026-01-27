@@ -39,7 +39,9 @@ jobs:
       build_melonds: ${{ steps.decide.outputs.build_melonds }}
       build_ppsspp: ${{ steps.decide.outputs.build_ppsspp }}
       build_xemu: ${{ steps.decide.outputs.build_xemu }}
-      build_libretro: ${{ steps.decide.outputs.build_libretro }}
+      build_libretro_heavy: ${{ steps.decide.outputs.build_libretro_heavy }}
+      build_libretro_light: ${{ steps.decide.outputs.build_libretro_light }}
+      build_duck_deps: ${{ steps.decide.outputs.build_duck_deps }}
       build_setperf: ${{ steps.decide.outputs.build_setperf }}
       hash_azahar: ${{ steps.hashes.outputs.hash_azahar }}
       hash_dolphin: ${{ steps.hashes.outputs.hash_dolphin }}
@@ -291,16 +293,12 @@ jobs:
             fi
           }
 
-          # Libretro rebuilds if either heavy or light changed
-          LIBRETRO_HEAVY_OK="${{ steps.marker-libretro-heavy.outputs.cache-hit }}"
-          LIBRETRO_LIGHT_OK="${{ steps.marker-libretro-light.outputs.cache-hit }}"
-          if [[ "$FORCE" == "true" ]] || [[ "$LIBRETRO_HEAVY_OK" != "true" ]] || [[ "$LIBRETRO_LIGHT_OK" != "true" ]]; then
-            echo "build_libretro=true" >> $GITHUB_OUTPUT
-            echo "  libretro: BUILD (force=$FORCE heavy_marker=$LIBRETRO_HEAVY_OK light_marker=$LIBRETRO_LIGHT_OK)"
-          else
-            echo "build_libretro=false" >> $GITHUB_OUTPUT
-            echo "  libretro: SKIP"
-          fi
+          # Libretro heavy and light are independent
+          decide_no_ver libretro_heavy "${{ steps.marker-libretro-heavy.outputs.cache-hit }}"
+          decide_no_ver libretro_light "${{ steps.marker-libretro-light.outputs.cache-hit }}"
+
+          # DuckStation deps separate from DuckStation build
+          decide_no_ver duck_deps "${{ steps.marker-duck-deps.outputs.cache-hit }}"
 
           decide_no_ver setperf "${{ steps.marker-setperf.outputs.cache-hit }}"
 
@@ -716,7 +714,7 @@ jobs:
   # DuckStation dependencies (Qt6, SDL3, etc.) - built separately for caching
   build-duckstation-deps:
     needs: prepare
-    if: needs.prepare.outputs.build_duckstation == 'true'
+    if: needs.prepare.outputs.build_duck_deps == 'true' || needs.prepare.outputs.build_duckstation == 'true'
     runs-on: ubuntu-24.04
     outputs:
       deps_ready: ${{ steps.check.outputs.deps_ready }}
@@ -1573,7 +1571,7 @@ jobs:
   # Libretro cores - Job 1: Heavy cores (FBNeo, MAME, VICE, DOSBox)
   build-libretro-heavy:
     needs: prepare
-    if: needs.prepare.outputs.build_libretro == 'true'
+    if: needs.prepare.outputs.build_libretro_heavy == 'true'
     runs-on: ubuntu-24.04
     steps:
       - name: Set up QEMU
@@ -1720,7 +1718,7 @@ jobs:
   # Libretro cores - Job 2: Light cores (computers, misc consoles)
   build-libretro-light:
     needs: prepare
-    if: needs.prepare.outputs.build_libretro == 'true'
+    if: needs.prepare.outputs.build_libretro_light == 'true'
     runs-on: ubuntu-24.04
     steps:
       - name: Set up QEMU
