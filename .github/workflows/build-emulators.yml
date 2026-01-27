@@ -1629,6 +1629,10 @@ jobs:
                 echo "=== Building $name ==="
                 if [[ ! -d "$name" ]]; then
                   git clone --depth 1 --recursive "https://github.com/libretro/$repo.git" "$name"
+                else
+                  cd "$name"
+                  git submodule update --init --recursive --depth 1
+                  cd "$CORES_DIR"
                 fi
                 cd "$name"
                 if [[ -n "$subdir" ]]; then
@@ -1770,6 +1774,10 @@ jobs:
                 echo "=== Building $name ==="
                 if [[ ! -d "$name" ]]; then
                   git clone --depth 1 --recursive "https://github.com/libretro/$repo.git" "$name"
+                else
+                  cd "$name"
+                  git submodule update --init --recursive --depth 1
+                  cd "$CORES_DIR"
                 fi
                 cd "$name"
                 if [[ -n "$subdir" ]]; then
