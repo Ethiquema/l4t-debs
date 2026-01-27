@@ -846,13 +846,13 @@ jobs:
               export CCACHE_MAXSIZE=5G
               ccache -z
 
-              # Clone source
+              # Clone or update source
               if [[ ! -d /workspace/src-duck ]]; then
-                git clone https://github.com/stenzek/duckstation.git /workspace/src-duck
+                git clone --recursive https://github.com/stenzek/duckstation.git /workspace/src-duck
               fi
 
               cd /workspace/src-duck
-              git fetch origin
+              git fetch --unshallow 2>/dev/null || git fetch origin
               git checkout "$COMMIT"
               git submodule update --init --recursive
 
@@ -1628,7 +1628,7 @@ jobs:
 
                 echo "=== Building $name ==="
                 if [[ ! -d "$name" ]]; then
-                  git clone --depth 1 "https://github.com/libretro/$repo.git" "$name"
+                  git clone --depth 1 --recursive "https://github.com/libretro/$repo.git" "$name"
                 fi
                 cd "$name"
                 if [[ -n "$subdir" ]]; then
@@ -1769,7 +1769,7 @@ jobs:
 
                 echo "=== Building $name ==="
                 if [[ ! -d "$name" ]]; then
-                  git clone --depth 1 "https://github.com/libretro/$repo.git" "$name"
+                  git clone --depth 1 --recursive "https://github.com/libretro/$repo.git" "$name"
                 fi
                 cd "$name"
                 if [[ -n "$subdir" ]]; then
