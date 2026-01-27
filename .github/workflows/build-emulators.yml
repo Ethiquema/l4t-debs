@@ -1654,10 +1654,17 @@ jobs:
             cd "$CORES_DIR"
           }
 
-          # Heavy cores
+          # Heavy cores (long compile times)
           build_core mame2003-plus-libretro mame2003-plus
           build_core vice-libretro vice "" "EMUTYPE=x64"
           build_core dosbox-pure dosbox-pure
+          build_core beetle-saturn-libretro beetle-saturn
+          build_core flycast flycast
+          build_core scummvm scummvm
+          build_core yabause yabause "" "HAVE_SSE=0"
+          build_core mupen64plus-libretro-nx mupen64plus-next
+          build_core parallel-n64 parallel-n64
+          build_core beetle-psx-libretro beetle-psx
 
           ccache -s
           echo "completed" > /workspace/build-status-heavy
@@ -1820,6 +1827,35 @@ jobs:
               build_core FreeIntv freeintv
               build_core geolith-libretro geolith
 
+              # Standard consoles
+              build_core beetle-pce-fast-libretro beetle-pce-fast
+              build_core beetle-supergrafx-libretro beetle-supergrafx
+              build_core beetle-vb-libretro beetle-vb
+              build_core beetle-wswan-libretro beetle-wswan
+              build_core bsnes-mercury bsnes-mercury-balanced "" "PROFILE=balanced"
+              build_core bsnes-mercury bsnes-mercury-performance "" "PROFILE=performance"
+              build_core fceumm-libretro fceumm
+              build_core gambatte-libretro gambatte
+              build_core Genesis-Plus-GX genesis-plus-gx
+              build_core gpsp gpsp
+              build_core libretro-handy handy
+              build_core beetle-gba-libretro mednafen-gba
+              build_core beetle-ngp-libretro mednafen-ngp
+              build_core beetle-pce-libretro mednafen-pce
+              build_core beetle-bsnes-libretro mednafen-snes
+              build_core beetle-wswan-libretro mednafen-wswan
+              build_core mgba mgba
+              build_core nestopia nestopia "" "core=libretro"
+              build_core pcsx_rearmed pcsx-rearmed
+              build_core picodrive picodrive
+              build_core prosystem-libretro prosystem
+              build_core QuickNES_Core quicknes
+              build_core SameBoy sameboy "" "FRONTEND=libretro"
+              build_core snes9x snes9x "" "core=libretro"
+              build_core stella2014-libretro stella
+              build_core tgbdual-libretro tgbdual
+              build_core vba-next vba-next
+
               # Games
               build_core libretro-prboom prboom
               build_core nxengine-libretro nxengine
@@ -1895,10 +1931,8 @@ jobs:
           Depends: libc6, zlib1g, libjemalloc2
           Section: games
           Priority: optional
-          Description: Additional Libretro cores (ARM64 L4T build)
-           FBNeo, VICE, DOSBox Pure, fMSX, blueMSX, PUAE, Fuse, Cap32,
-           Atari800, PX68k, Quasi88, Opera, NeoCD, Virtual Jaguar, O2EM,
-           VecX, FreeChaF, FreeIntv, Geolith, PrBoom, NXEngine, MAME 2003+
+          Description: Libretro cores for RetroArch (ARM64 L4T build)
+           All standard libretro cores compiled for Tegra X1 ARM64.
           EOF
 
             dpkg-deb --build pkg libretro-cores-l4t_1.0.0_arm64.deb
