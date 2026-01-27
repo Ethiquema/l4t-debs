@@ -201,10 +201,10 @@ Depends: libc6, libjemalloc2, libqt6widgets6, libqt6gui6, libqt6core6, libqt6mul
 Replaces: citra
 Provides: citra
 Filename: pool/main/azahar-emu-l4t_2124.2_arm64.deb
-Size: 11519342
-MD5sum: 4940208e803c09a588ff6b1cc07b4d5a
-SHA1: 4a04cb236ae2c6852f14be29ed574bcdfb3f7bdb
-SHA256: f7fb5f1909c7b785da4675367cdefb9d6a7826db059358dad101ef8ad3acbd77
+Size: 11519570
+MD5sum: b5d3d4fa3f87464eb2d015c456284bfb
+SHA1: 390fa5313375e3783c665a764aa8c7bf16befe44
+SHA256: c61de2d8c7bdd176a254830e4f20ffaaf9aeb245800c9b3e07937f6c20a10423
 Section: games
 Priority: optional
 Description: Azahar 3DS Emulator (ARM64 L4T build)
@@ -2081,10 +2081,10 @@ Architecture: arm64
 Maintainer: Ethiquema <noreply@ethiquema.github.io>
 Depends: libc6, zlib1g, libjemalloc2
 Filename: pool/main/libretro-cores-l4t_1.0.0_arm64.deb
-Size: 504438
-MD5sum: 1526843114fc26ae5b1de532c94b6033
-SHA1: 8760d1308219efe08ecbe944336a0fa362246916
-SHA256: ce65f84ca55a822d362b98af049140f1d27c949c3725aad3284c99ca44a870e1
+Size: 11281992
+MD5sum: 4df07f399d85d7e84a2baf8741f41d59
+SHA1: c5b07a45827ea3826a66bcfeb4ef49320c4b3a10
+SHA256: 03e3886fda0754ecec24d660e4c4773c5cc0be51c7dc390ef2085bcb7b94b6aa
 Section: games
 Priority: optional
 Description: Additional Libretro cores (ARM64 L4T build)
