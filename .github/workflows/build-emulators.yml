@@ -1645,10 +1645,11 @@ jobs:
                   cd "$subdir"
                 fi
                 make clean 2>/dev/null || true
+                # Don't pass CFLAGS/CXXFLAGS as make args (overrides Makefile include paths)
+                # They are already exported as env vars, Makefiles will append to them
                 timeout ${BUILD_TIMEOUT}s make -j$(nproc) platform=unix $make_args \
                   CC="ccache gcc" CXX="ccache g++" \
-                  CFLAGS="$CFLAGS" CXXFLAGS="$CXXFLAGS" LDFLAGS="$LDFLAGS" \
-                  SKIPDEPEND=1 WERROR=0 || {
+                  LDFLAGS="$LDFLAGS" SKIPDEPEND=1 WERROR=0 || {
                   EXIT_CODE=$?
                   if [[ $EXIT_CODE -eq 124 ]]; then
                     echo "TIMEOUT on $name"
@@ -1661,8 +1662,6 @@ jobs:
               }
 
               # Heavy cores
-              # FBNeo disabled: has Windows-specific types (RECT) not available on Linux ARM64
-              # build_core FBNeo fbneo "src/burner/libretro"
               build_core mame2003-plus-libretro mame2003-plus
               build_core vice-libretro vice "" "EMUTYPE=x64"
               build_core dosbox-pure dosbox-pure
