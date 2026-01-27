@@ -2081,10 +2081,10 @@ Architecture: arm64
 Maintainer: Ethiquema <noreply@ethiquema.github.io>
 Depends: libc6, zlib1g, libjemalloc2
 Filename: pool/main/libretro-cores-l4t_1.0.0_arm64.deb
-Size: 504434
-MD5sum: 91dcde003087e1f29b6d7c647b36acff
-SHA1: aee5107590aa74e9ff98210f4bd3e3d69789ad79
-SHA256: 75e0ae0f41eefe3d4002b153413ba030a085af901b8f89dbb2af2e51547fd453
+Size: 504498
+MD5sum: 1dd05c3919dfd8ce39415f6a6164a3dd
+SHA1: 91723f47b0552e679c4e5d475fe4fad387c9c6d9
+SHA256: b5dc72f491ff85796c7edc99880b9eaa2c34a207efb94e6e169feebad46b91d4
 Section: games
 Priority: optional
 Description: Additional Libretro cores (ARM64 L4T build)
@@ -3253,10 +3253,10 @@ Depends: libc6, libjemalloc2, libsdl2-2.0-0, libsdl2-ttf-2.0-0, libglew2.2, libs
 Conflicts: ppsspp
 Provides: ppsspp
 Filename: pool/main/ppsspp-l4t_1.19.3_arm64.deb
-Size: 21566908
-MD5sum: 6899fe7bcf7dbb5543dc6adfaa48780d
-SHA1: 4d5ad5da269057a2a41f61197e51ef0f7b69c770
-SHA256: dd17a3f6d75e19f9d7410e592f04e85e620a1a434fc85a6d58d75454825d21a3
+Size: 21566862
+MD5sum: 11f368589e9f86d9823fdaafb24b6861
+SHA1: 8625a8aa495f217b5340e686cde44599e7165398
+SHA256: 3f40ea1c0d60951c3aeab394c95e0c022e12946d26bdef7d02e777992f92d7cf
 Section: games
 Priority: optional
 Description: PPSSPP PlayStation Portable Emulator (ARM64 L4T build)
@@ -3643,10 +3643,10 @@ Architecture: arm64
 Maintainer: Ethiquema <noreply@ethiquema.github.io>
 Depends: libc6, libjemalloc2, libsdl2-2.0-0, libepoxy0, libpixman-1-0, libgtk-3-0t64, libssl3t64, libsamplerate0, libpcap0.8t64, libslirp0
 Filename: pool/main/xemu-l4t_0.8.133_arm64.deb
-Size: 30228626
-MD5sum: 947eb106e5768667516f018648890acc
-SHA1: db818eed3c085ad34a3c0d1d4ea2e60cf23aa7da
-SHA256: 6d30bbce853d0ca6584bc8ffe6470cd3f8bc150ee21f52e76bd40761cb61036b
+Size: 30228272
+MD5sum: bcd5b5e49f504f09bb4c4a975b57ce4e
+SHA1: 40dee7bb6da963bd12cf5e00e7518692654efa6b
+SHA256: 69fb40d93625d7c392b8c913e46f2950bd9572faba067710d9555cb39a2ebd17
 Section: games
 Priority: optional
 Description: xemu Original Xbox Emulator (ARM64 L4T build)
