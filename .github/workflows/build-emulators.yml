@@ -32,18 +32,149 @@ jobs:
       melonds_version: ${{ steps.versions.outputs.melonds_version }}
       ppsspp_version: ${{ steps.versions.outputs.ppsspp_version }}
       xemu_version: ${{ steps.versions.outputs.xemu_version }}
-      build_azahar: ${{ steps.versions.outputs.build_azahar }}
-      build_dolphin: ${{ steps.versions.outputs.build_dolphin }}
-      build_duckstation: ${{ steps.versions.outputs.build_duckstation }}
-      build_esde: ${{ steps.versions.outputs.build_esde }}
-      build_melonds: ${{ steps.versions.outputs.build_melonds }}
-      build_ppsspp: ${{ steps.versions.outputs.build_ppsspp }}
-      build_xemu: ${{ steps.versions.outputs.build_xemu }}
+      build_azahar: ${{ steps.decide.outputs.build_azahar }}
+      build_dolphin: ${{ steps.decide.outputs.build_dolphin }}
+      build_duckstation: ${{ steps.decide.outputs.build_duckstation }}
+      build_esde: ${{ steps.decide.outputs.build_esde }}
+      build_melonds: ${{ steps.decide.outputs.build_melonds }}
+      build_ppsspp: ${{ steps.decide.outputs.build_ppsspp }}
+      build_xemu: ${{ steps.decide.outputs.build_xemu }}
+      build_libretro: ${{ steps.decide.outputs.build_libretro }}
+      build_setperf: ${{ steps.decide.outputs.build_setperf }}
+      hash_azahar: ${{ steps.hashes.outputs.hash_azahar }}
+      hash_dolphin: ${{ steps.hashes.outputs.hash_dolphin }}
+      hash_duck_deps: ${{ steps.hashes.outputs.hash_duck_deps }}
+      hash_duck: ${{ steps.hashes.outputs.hash_duck }}
+      hash_esde: ${{ steps.hashes.outputs.hash_esde }}
+      hash_melonds: ${{ steps.hashes.outputs.hash_melonds }}
+      hash_ppsspp: ${{ steps.hashes.outputs.hash_ppsspp }}
+      hash_xemu: ${{ steps.hashes.outputs.hash_xemu }}
+      hash_libretro_heavy: ${{ steps.hashes.outputs.hash_libretro_heavy }}
+      hash_libretro_light: ${{ steps.hashes.outputs.hash_libretro_light }}
+      hash_setperf: ${{ steps.hashes.outputs.hash_setperf }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           ref: main
+
+      - name: Compute job hashes
+        id: hashes
+        run: |
+          WORKFLOW=".github/workflows/build-emulators.yml"
+
+          # Extract hash of each job section from the workflow YAML
+          job_hash() {
+            local job_name="$1"
+            sed -n "/^  ${job_name}:/,/^  [a-z]/p" "$WORKFLOW" | head -n -1 | sha256sum | cut -d' ' -f1
+          }
+
+          echo "hash_azahar=$(job_hash 'build-azahar')" >> $GITHUB_OUTPUT
+          echo "hash_dolphin=$(job_hash 'build-dolphin')" >> $GITHUB_OUTPUT
+          echo "hash_duck_deps=$(job_hash 'build-duckstation-deps')" >> $GITHUB_OUTPUT
+          echo "hash_duck=$(job_hash 'build-duckstation')" >> $GITHUB_OUTPUT
+          echo "hash_esde=$(job_hash 'build-esde')" >> $GITHUB_OUTPUT
+          echo "hash_melonds=$(job_hash 'build-melonds')" >> $GITHUB_OUTPUT
+          echo "hash_ppsspp=$(job_hash 'build-ppsspp')" >> $GITHUB_OUTPUT
+          echo "hash_xemu=$(job_hash 'build-xemu')" >> $GITHUB_OUTPUT
+          echo "hash_libretro_heavy=$(job_hash 'build-libretro-heavy')" >> $GITHUB_OUTPUT
+          echo "hash_libretro_light=$(job_hash 'build-libretro-light')" >> $GITHUB_OUTPUT
+          echo "hash_setperf=$(job_hash 'build-setperf')" >> $GITHUB_OUTPUT
+
+      - name: Check success markers
+        id: markers
+        run: |
+          # We use the GitHub API to check if cache keys exist
+          # This avoids needing 11 separate actions/cache/restore steps
+          echo "Checking success markers..."
+
+      - name: Check azahar marker
+        id: marker-azahar
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/marker
+          key: success-azahar-${{ steps.hashes.outputs.hash_azahar }}
+          lookup-only: true
+
+      - name: Check dolphin marker
+        id: marker-dolphin
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/marker
+          key: success-dolphin-${{ steps.hashes.outputs.hash_dolphin }}
+          lookup-only: true
+
+      - name: Check duckstation-deps marker
+        id: marker-duck-deps
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/marker
+          key: success-duck-deps-${{ steps.hashes.outputs.hash_duck_deps }}
+          lookup-only: true
+
+      - name: Check duckstation marker
+        id: marker-duck
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/marker
+          key: success-duck-${{ steps.hashes.outputs.hash_duck }}
+          lookup-only: true
+
+      - name: Check esde marker
+        id: marker-esde
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/marker
+          key: success-esde-${{ steps.hashes.outputs.hash_esde }}
+          lookup-only: true
+
+      - name: Check melonds marker
+        id: marker-melonds
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/marker
+          key: success-melonds-${{ steps.hashes.outputs.hash_melonds }}
+          lookup-only: true
+
+      - name: Check ppsspp marker
+        id: marker-ppsspp
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/marker
+          key: success-ppsspp-${{ steps.hashes.outputs.hash_ppsspp }}
+          lookup-only: true
+
+      - name: Check xemu marker
+        id: marker-xemu
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/marker
+          key: success-xemu-${{ steps.hashes.outputs.hash_xemu }}
+          lookup-only: true
+
+      - name: Check libretro-heavy marker
+        id: marker-libretro-heavy
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/marker
+          key: success-libretro-heavy-${{ steps.hashes.outputs.hash_libretro_heavy }}
+          lookup-only: true
+
+      - name: Check libretro-light marker
+        id: marker-libretro-light
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/marker
+          key: success-libretro-light-${{ steps.hashes.outputs.hash_libretro_light }}
+          lookup-only: true
+
+      - name: Check setperf marker
+        id: marker-setperf
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/marker
+          key: success-setperf-${{ steps.hashes.outputs.hash_setperf }}
+          lookup-only: true
 
       - name: Fetch latest versions and check for updates
         id: versions
@@ -97,56 +228,8 @@ jobs:
           echo "ppsspp_version=$PPSSPP_TAG" >> $GITHUB_OUTPUT
           echo "xemu_version=$XEMU_TAG" >> $GITHUB_OUTPUT
 
-          # Force rebuild on workflow changes or manual dispatch
-          FORCE_REBUILD="${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}"
-
-          # Check if updates are needed (or force rebuild)
-          if [[ "$FORCE_REBUILD" == "true" ]] || [[ "$AZAHAR_TAG" != "$CURRENT_AZAHAR" ]]; then
-            echo "build_azahar=true" >> $GITHUB_OUTPUT
-          else
-            echo "build_azahar=false" >> $GITHUB_OUTPUT
-          fi
-
-          if [[ "$FORCE_REBUILD" == "true" ]] || [[ "$DOLPHIN_COMMIT" != "$CURRENT_DOLPHIN" ]]; then
-            echo "build_dolphin=true" >> $GITHUB_OUTPUT
-          else
-            echo "build_dolphin=false" >> $GITHUB_OUTPUT
-          fi
-
-          if [[ "$FORCE_REBUILD" == "true" ]] || [[ "$DUCK_COMMIT" != "$CURRENT_DUCK" ]]; then
-            echo "build_duckstation=true" >> $GITHUB_OUTPUT
-          else
-            echo "build_duckstation=false" >> $GITHUB_OUTPUT
-          fi
-
-          if [[ "$FORCE_REBUILD" == "true" ]] || [[ "$ESDE_TAG" != "$CURRENT_ESDE" ]]; then
-            echo "build_esde=true" >> $GITHUB_OUTPUT
-          else
-            echo "build_esde=false" >> $GITHUB_OUTPUT
-          fi
-
-          if [[ "$FORCE_REBUILD" == "true" ]] || [[ "$MELON_TAG" != "$CURRENT_MELON" ]]; then
-            echo "build_melonds=true" >> $GITHUB_OUTPUT
-          else
-            echo "build_melonds=false" >> $GITHUB_OUTPUT
-          fi
-
-          if [[ "$FORCE_REBUILD" == "true" ]] || [[ "$PPSSPP_TAG" != "$CURRENT_PPSSPP" ]]; then
-            echo "build_ppsspp=true" >> $GITHUB_OUTPUT
-          else
-            echo "build_ppsspp=false" >> $GITHUB_OUTPUT
-          fi
-
-          if [[ "$FORCE_REBUILD" == "true" ]] || [[ "$XEMU_TAG" != "$CURRENT_XEMU" ]]; then
-            echo "build_xemu=true" >> $GITHUB_OUTPUT
-          else
-            echo "build_xemu=false" >> $GITHUB_OUTPUT
-          fi
-
-          echo "Force rebuild: $FORCE_REBUILD"
-
-          # Log status
-          echo "=== Build status ==="
+          # Log versions
+          echo "=== Upstream versions ==="
           echo "Azahar: $CURRENT_AZAHAR -> $AZAHAR_TAG"
           echo "Dolphin: ${CURRENT_DOLPHIN:0:7} -> ${DOLPHIN_COMMIT:0:7}"
           echo "DuckStation: ${CURRENT_DUCK:0:7} -> ${DUCK_COMMIT:0:7}"
@@ -154,6 +237,72 @@ jobs:
           echo "melonDS: $CURRENT_MELON -> $MELON_TAG"
           echo "PPSSPP: $CURRENT_PPSSPP -> $PPSSPP_TAG"
           echo "xemu: $CURRENT_XEMU -> $XEMU_TAG"
+
+          # Version change flags (used by decide step)
+          echo "ver_azahar=$([[ "$AZAHAR_TAG" != "$CURRENT_AZAHAR" ]] && echo true || echo false)" >> $GITHUB_OUTPUT
+          echo "ver_dolphin=$([[ "$DOLPHIN_COMMIT" != "$CURRENT_DOLPHIN" ]] && echo true || echo false)" >> $GITHUB_OUTPUT
+          echo "ver_duck=$([[ "$DUCK_COMMIT" != "$CURRENT_DUCK" ]] && echo true || echo false)" >> $GITHUB_OUTPUT
+          echo "ver_esde=$([[ "$ESDE_TAG" != "$CURRENT_ESDE" ]] && echo true || echo false)" >> $GITHUB_OUTPUT
+          echo "ver_melonds=$([[ "$MELON_TAG" != "$CURRENT_MELON" ]] && echo true || echo false)" >> $GITHUB_OUTPUT
+          echo "ver_ppsspp=$([[ "$PPSSPP_TAG" != "$CURRENT_PPSSPP" ]] && echo true || echo false)" >> $GITHUB_OUTPUT
+          echo "ver_xemu=$([[ "$XEMU_TAG" != "$CURRENT_XEMU" ]] && echo true || echo false)" >> $GITHUB_OUTPUT
+
+      - name: Decide which jobs to build
+        id: decide
+        run: |
+          # Force rebuild everything on manual dispatch only
+          FORCE="${{ github.event_name == 'workflow_dispatch' }}"
+
+          # Build if: force OR version changed OR no success marker (= modified or failed)
+          decide() {
+            local name="$1"
+            local ver_changed="$2"
+            local has_marker="$3"
+
+            if [[ "$FORCE" == "true" ]] || [[ "$ver_changed" == "true" ]] || [[ "$has_marker" != "true" ]]; then
+              echo "build_${name}=true" >> $GITHUB_OUTPUT
+              echo "  $name: BUILD (force=$FORCE ver=$ver_changed marker=$has_marker)"
+            else
+              echo "build_${name}=false" >> $GITHUB_OUTPUT
+              echo "  $name: SKIP (unchanged + succeeded)"
+            fi
+          }
+
+          echo "=== Build decisions ==="
+          decide azahar      "${{ steps.versions.outputs.ver_azahar }}"   "${{ steps.marker-azahar.outputs.cache-hit }}"
+          decide dolphin     "${{ steps.versions.outputs.ver_dolphin }}"  "${{ steps.marker-dolphin.outputs.cache-hit }}"
+          decide duckstation "${{ steps.versions.outputs.ver_duck }}"     "${{ steps.marker-duck.outputs.cache-hit }}"
+          decide esde        "${{ steps.versions.outputs.ver_esde }}"     "${{ steps.marker-esde.outputs.cache-hit }}"
+          decide melonds     "${{ steps.versions.outputs.ver_melonds }}"  "${{ steps.marker-melonds.outputs.cache-hit }}"
+          decide ppsspp      "${{ steps.versions.outputs.ver_ppsspp }}"   "${{ steps.marker-ppsspp.outputs.cache-hit }}"
+          decide xemu        "${{ steps.versions.outputs.ver_xemu }}"     "${{ steps.marker-xemu.outputs.cache-hit }}"
+
+          # Libretro and setperf: no version check, only hash-based
+          decide_no_ver() {
+            local name="$1"
+            local has_marker="$2"
+
+            if [[ "$FORCE" == "true" ]] || [[ "$has_marker" != "true" ]]; then
+              echo "build_${name}=true" >> $GITHUB_OUTPUT
+              echo "  $name: BUILD (force=$FORCE marker=$has_marker)"
+            else
+              echo "build_${name}=false" >> $GITHUB_OUTPUT
+              echo "  $name: SKIP (unchanged + succeeded)"
+            fi
+          }
+
+          # Libretro rebuilds if either heavy or light changed
+          LIBRETRO_HEAVY_OK="${{ steps.marker-libretro-heavy.outputs.cache-hit }}"
+          LIBRETRO_LIGHT_OK="${{ steps.marker-libretro-light.outputs.cache-hit }}"
+          if [[ "$FORCE" == "true" ]] || [[ "$LIBRETRO_HEAVY_OK" != "true" ]] || [[ "$LIBRETRO_LIGHT_OK" != "true" ]]; then
+            echo "build_libretro=true" >> $GITHUB_OUTPUT
+            echo "  libretro: BUILD (force=$FORCE heavy_marker=$LIBRETRO_HEAVY_OK light_marker=$LIBRETRO_LIGHT_OK)"
+          else
+            echo "build_libretro=false" >> $GITHUB_OUTPUT
+            echo "  libretro: SKIP"
+          fi
+
+          decide_no_ver setperf "${{ steps.marker-setperf.outputs.cache-hit }}"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -386,6 +535,17 @@ jobs:
           path: "*.deb"
           retention-days: 1
 
+      - name: Save success marker
+        if: steps.build.outputs.completed == 'true'
+        run: mkdir -p /tmp/marker && echo ok > /tmp/marker/ok
+
+      - name: Upload success marker
+        if: steps.build.outputs.completed == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: /tmp/marker
+          key: success-azahar-${{ needs.prepare.outputs.hash_azahar }}
+
       - name: Trigger retry if timeout
         if: steps.build.outputs.completed == 'false'
         uses: actions/github-script@v7
@@ -524,6 +684,17 @@ jobs:
           path: "*.deb"
           retention-days: 1
 
+      - name: Save success marker
+        if: steps.build.outputs.completed == 'true'
+        run: mkdir -p /tmp/marker && echo ok > /tmp/marker/ok
+
+      - name: Upload success marker
+        if: steps.build.outputs.completed == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: /tmp/marker
+          key: success-dolphin-${{ needs.prepare.outputs.hash_dolphin }}
+
       - name: Trigger retry if timeout
         if: steps.build.outputs.completed == 'false'
         uses: actions/github-script@v7
@@ -607,6 +778,17 @@ jobs:
       - name: Check deps status
         id: check
         run: echo "deps_ready=true" >> $GITHUB_OUTPUT
+
+      - name: Save success marker
+        if: always() && steps.check.outputs.deps_ready == 'true'
+        run: mkdir -p /tmp/marker && echo ok > /tmp/marker/ok
+
+      - name: Upload success marker
+        if: always() && steps.check.outputs.deps_ready == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: /tmp/marker
+          key: success-duck-deps-${{ needs.prepare.outputs.hash_duck_deps }}
 
   # DuckStation build (uses pre-built dependencies)
   build-duckstation:
@@ -754,6 +936,17 @@ jobs:
           path: "*.deb"
           retention-days: 1
 
+      - name: Save success marker
+        if: steps.build.outputs.completed == 'true'
+        run: mkdir -p /tmp/marker && echo ok > /tmp/marker/ok
+
+      - name: Upload success marker
+        if: steps.build.outputs.completed == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: /tmp/marker
+          key: success-duck-${{ needs.prepare.outputs.hash_duck }}
+
       - name: Trigger retry if timeout
         if: steps.build.outputs.completed == 'false'
         uses: actions/github-script@v7
@@ -884,6 +1077,17 @@ jobs:
           path: "*.deb"
           retention-days: 1
 
+      - name: Save success marker
+        if: steps.build.outputs.completed == 'true'
+        run: mkdir -p /tmp/marker && echo ok > /tmp/marker/ok
+
+      - name: Upload success marker
+        if: steps.build.outputs.completed == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: /tmp/marker
+          key: success-esde-${{ needs.prepare.outputs.hash_esde }}
+
       - name: Trigger retry if timeout
         if: steps.build.outputs.completed == 'false'
         uses: actions/github-script@v7
@@ -1013,6 +1217,17 @@ jobs:
           name: deb-melonds
           path: "*.deb"
           retention-days: 1
+
+      - name: Save success marker
+        if: steps.build.outputs.completed == 'true'
+        run: mkdir -p /tmp/marker && echo ok > /tmp/marker/ok
+
+      - name: Upload success marker
+        if: steps.build.outputs.completed == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: /tmp/marker
+          key: success-melonds-${{ needs.prepare.outputs.hash_melonds }}
 
       - name: Trigger retry if timeout
         if: steps.build.outputs.completed == 'false'
@@ -1165,6 +1380,17 @@ jobs:
           path: "*.deb"
           retention-days: 1
 
+      - name: Save success marker
+        if: steps.build.outputs.completed == 'true'
+        run: mkdir -p /tmp/marker && echo ok > /tmp/marker/ok
+
+      - name: Upload success marker
+        if: steps.build.outputs.completed == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: /tmp/marker
+          key: success-ppsspp-${{ needs.prepare.outputs.hash_ppsspp }}
+
       - name: Trigger retry if timeout
         if: steps.build.outputs.completed == 'false'
         uses: actions/github-script@v7
@@ -1301,6 +1527,17 @@ jobs:
           path: "*.deb"
           retention-days: 1
 
+      - name: Save success marker
+        if: steps.build.outputs.completed == 'true'
+        run: mkdir -p /tmp/marker && echo ok > /tmp/marker/ok
+
+      - name: Upload success marker
+        if: steps.build.outputs.completed == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: /tmp/marker
+          key: success-xemu-${{ needs.prepare.outputs.hash_xemu }}
+
       - name: Trigger retry if timeout
         if: steps.build.outputs.completed == 'false'
         uses: actions/github-script@v7
@@ -1316,6 +1553,7 @@ jobs:
   # Libretro cores - Job 1: Heavy cores (FBNeo, MAME, VICE, DOSBox)
   build-libretro-heavy:
     needs: prepare
+    if: needs.prepare.outputs.build_libretro == 'true'
     runs-on: ubuntu-24.04
     steps:
       - name: Set up QEMU
@@ -1398,8 +1636,9 @@ jobs:
                 cd "$CORES_DIR"
               }
 
-              # Heavy cores (WERROR=0 disables -Werror in FBNeo)
-              build_core FBNeo fbneo "src/burner/libretro"
+              # Heavy cores
+              # FBNeo disabled: has Windows-specific types (RECT) not available on Linux ARM64
+              # build_core FBNeo fbneo "src/burner/libretro"
               build_core mame2003-plus-libretro mame2003-plus
               build_core vice-libretro vice "" "EMUTYPE=x64"
               build_core dosbox-pure dosbox-pure
@@ -1429,6 +1668,17 @@ jobs:
           path: "cores-heavy/*.so"
           retention-days: 1
 
+      - name: Save success marker
+        if: steps.build.outputs.completed == 'true'
+        run: mkdir -p /tmp/marker && echo ok > /tmp/marker/ok
+
+      - name: Upload success marker
+        if: steps.build.outputs.completed == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: /tmp/marker
+          key: success-libretro-heavy-${{ needs.prepare.outputs.hash_libretro_heavy }}
+
       - name: Trigger retry if timeout
         if: steps.build.outputs.completed == 'false'
         uses: actions/github-script@v7
@@ -1444,6 +1694,7 @@ jobs:
   # Libretro cores - Job 2: Light cores (computers, misc consoles)
   build-libretro-light:
     needs: prepare
+    if: needs.prepare.outputs.build_libretro == 'true'
     runs-on: ubuntu-24.04
     steps:
       - name: Set up QEMU
@@ -1570,6 +1821,17 @@ jobs:
           path: "cores-light/*.so"
           retention-days: 1
 
+      - name: Save success marker
+        if: steps.build.outputs.completed == 'true'
+        run: mkdir -p /tmp/marker && echo ok > /tmp/marker/ok
+
+      - name: Upload success marker
+        if: steps.build.outputs.completed == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: /tmp/marker
+          key: success-libretro-light-${{ needs.prepare.outputs.hash_libretro_light }}
+
   # Package all libretro cores into single deb
   build-libretro-package:
     needs: [build-libretro-heavy, build-libretro-light]
@@ -1627,6 +1889,8 @@ jobs:
           retention-days: 1
 
   build-setperf:
+    needs: prepare
+    if: needs.prepare.outputs.build_setperf == 'true'
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
@@ -1646,6 +1910,15 @@ jobs:
           name: deb-setperf
           path: "packages/setperf/*.deb"
           retention-days: 1
+
+      - name: Save success marker
+        run: mkdir -p /tmp/marker && echo ok > /tmp/marker/ok
+
+      - name: Upload success marker
+        uses: actions/cache/save@v4
+        with:
+          path: /tmp/marker
+          key: success-setperf-${{ needs.prepare.outputs.hash_setperf }}
 
   # ===========================================================================
   # UPDATE REPO: Collect all debs and update APT repository
