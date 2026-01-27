@@ -2081,10 +2081,10 @@ Architecture: arm64
 Maintainer: Ethiquema <noreply@ethiquema.github.io>
 Depends: libc6, zlib1g, libjemalloc2
 Filename: pool/main/libretro-cores-l4t_1.0.0_arm64.deb
-Size: 504498
-MD5sum: 1dd05c3919dfd8ce39415f6a6164a3dd
-SHA1: 91723f47b0552e679c4e5d475fe4fad387c9c6d9
-SHA256: b5dc72f491ff85796c7edc99880b9eaa2c34a207efb94e6e169feebad46b91d4
+Size: 504438
+MD5sum: 1526843114fc26ae5b1de532c94b6033
+SHA1: 8760d1308219efe08ecbe944336a0fa362246916
+SHA256: ce65f84ca55a822d362b98af049140f1d27c949c3725aad3284c99ca44a870e1
 Section: games
 Priority: optional
 Description: Additional Libretro cores (ARM64 L4T build)
