@@ -1610,10 +1610,10 @@ jobs:
           export CCACHE_MAXSIZE=5G
           ccache -z
 
-          # ARM64 build flags for Tegra X1 with LTO
-          export CFLAGS="-O3 -flto -march=armv8-a+crc+simd -mtune=cortex-a57"
-          export CXXFLAGS="-O3 -flto -march=armv8-a+crc+simd -mtune=cortex-a57"
-          export LDFLAGS="-flto -ljemalloc"
+          # ARM64 build flags for Tegra X1 with ThinLTO
+          export CFLAGS="-O3 -flto=auto -march=armv8-a+crc+simd -mtune=cortex-a57"
+          export CXXFLAGS="-O3 -flto=auto -march=armv8-a+crc+simd -mtune=cortex-a57"
+          export LDFLAGS="-flto=auto -shared -ljemalloc"
 
           CORES_DIR=/workspace/libretro-cores
           PKG_DIR=/workspace/cores-heavy
