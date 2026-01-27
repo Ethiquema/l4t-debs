@@ -324,9 +324,12 @@ jobs:
           docker save emu-deps-image -o /tmp/emu-deps.tar
           docker rm emu-deps
 
-      - name: Load and update base image
+      - name: Load base image
+        run: docker load -i /tmp/emu-deps.tar
+
+      - name: Install dependencies into base image
+        if: steps.cache.outputs.cache-hit != 'true'
         run: |
-          docker load -i /tmp/emu-deps.tar
           docker run --name emu-deps-update --platform linux/arm64 \
             emu-deps-image bash -c '
               set -e
@@ -380,6 +383,9 @@ jobs:
               apt-get clean
               rm -rf /var/lib/apt/lists/*
             '
+      - name: Commit and save base image
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
           docker commit emu-deps-update emu-deps-image
           docker save emu-deps-image -o /tmp/emu-deps.tar
           docker rm emu-deps-update
