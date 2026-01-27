@@ -1633,12 +1633,12 @@ jobs:
                 local make_args=${4:-}
 
                 echo "=== Building $name ==="
+                if [[ -d "$name" ]] && [[ -f "$name/.gitmodules" ]] && [[ -z "$(ls -A "$name/libretro-common" 2>/dev/null)" ]]; then
+                  echo "Submodules missing in cached $name, re-cloning..."
+                  rm -rf "$name"
+                fi
                 if [[ ! -d "$name" ]]; then
                   git clone --depth 1 --recursive "https://github.com/libretro/$repo.git" "$name"
-                else
-                  cd "$name"
-                  git submodule update --init --recursive --depth 1
-                  cd "$CORES_DIR"
                 fi
                 cd "$name"
                 if [[ -n "$subdir" ]]; then
@@ -1778,12 +1778,12 @@ jobs:
                 local make_args=${4:-}
 
                 echo "=== Building $name ==="
+                if [[ -d "$name" ]] && [[ -f "$name/.gitmodules" ]] && [[ -z "$(ls -A "$name/libretro-common" 2>/dev/null)" ]]; then
+                  echo "Submodules missing in cached $name, re-cloning..."
+                  rm -rf "$name"
+                fi
                 if [[ ! -d "$name" ]]; then
                   git clone --depth 1 --recursive "https://github.com/libretro/$repo.git" "$name"
-                else
-                  cd "$name"
-                  git submodule update --init --recursive --depth 1
-                  cd "$CORES_DIR"
                 fi
                 cd "$name"
                 if [[ -n "$subdir" ]]; then
