@@ -352,14 +352,14 @@ Package: emulationstation-de-l4t
 Version: 3.4.0
 Architecture: arm64
 Maintainer: Ethiquema <noreply@ethiquema.github.io>
-Depends: libc6, libsdl2-2.0-0, libavcodec60, libavformat60, libswscale7, libfreeimage3t64, libfreetype6, libcurl4t64, libpugixml1v5, libvlc5, libpoppler-cpp0t64
+Depends: libc6, libsdl2-2.0-0, libavcodec60, libavformat60, libswscale7, libfreeimage3, libfreetype6, libcurl4t64, libpugixml1v5, libvlc5, libpoppler-cpp0t64
 Conflicts: emulationstation
 Provides: emulationstation
 Filename: pool/main/emulationstation-de-l4t_3.4.0_arm64.deb
-Size: 45203632
-MD5sum: 3670da75929772b2aa866e0a4b986241
-SHA1: b20ee794f7c865f3a9f3014afe67fea8cac2c401
-SHA256: 44d6ba7f7689eacfff1a11ec12e1949798efa8aa0b02b8d5843e83511dd0cae8
+Size: 45204210
+MD5sum: 69096692055691768e270965fbbfca73
+SHA1: d9b8c518de6729ac9f11ba8d5af73be6aa19042e
+SHA256: aa02c3c941059a47315dc15e62d80b0ef65346e6dc279de1e926636b53dc658f
 Section: games
 Priority: optional
 Description: EmulationStation Desktop Edition (ARM64 L4T build)
