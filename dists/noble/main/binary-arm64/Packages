@@ -356,10 +356,10 @@ Depends: libc6, libsdl2-2.0-0, libavcodec60, libavformat60, libswscale7, libfree
 Conflicts: emulationstation
 Provides: emulationstation
 Filename: pool/main/emulationstation-de-l4t_3.4.0_arm64.deb
-Size: 45204580
-MD5sum: fabd7857e28f868fb14d5e23b517ff0f
-SHA1: cb3a80b935cc69208877071c110ee19842daba45
-SHA256: ccda821f412bf72c0a9b99c8fb4b5cc070ef43e9028ed116bd03b74829f9d0c2
+Size: 45203632
+MD5sum: 3670da75929772b2aa866e0a4b986241
+SHA1: b20ee794f7c865f3a9f3014afe67fea8cac2c401
+SHA256: 44d6ba7f7689eacfff1a11ec12e1949798efa8aa0b02b8d5843e83511dd0cae8
 Section: games
 Priority: optional
 Description: EmulationStation Desktop Edition (ARM64 L4T build)
@@ -2082,9 +2082,9 @@ Maintainer: Ethiquema <noreply@ethiquema.github.io>
 Depends: libc6, zlib1g, libjemalloc2
 Filename: pool/main/libretro-cores-l4t_1.0.0_arm64.deb
 Size: 504434
-MD5sum: 29ce20e3a08f57617264685a75ca64c2
-SHA1: 911063cd3a4abfd2b10fca047b3e2ba2bb8f249b
-SHA256: a29e00477b5283d0dc00e9c898525f837a8ad59d59dfd1e7c605ed056b39a131
+MD5sum: 91dcde003087e1f29b6d7c647b36acff
+SHA1: aee5107590aa74e9ff98210f4bd3e3d69789ad79
+SHA256: 75e0ae0f41eefe3d4002b153413ba030a085af901b8f89dbb2af2e51547fd453
 Section: games
 Priority: optional
 Description: Additional Libretro cores (ARM64 L4T build)
@@ -2655,10 +2655,10 @@ Architecture: arm64
 Maintainer: Ethiquema <noreply@ethiquema.github.io>
 Depends: libc6, libjemalloc2, libqt6widgets6, libqt6gui6, libqt6core6, libqt6multimedia6, libsdl2-2.0-0, libslirp0, libarchive13t64, libzstd1
 Filename: pool/main/melonds-l4t_1.1_arm64.deb
-Size: 1544576
-MD5sum: 90d8105a57e34763afcb0b17502abf94
-SHA1: 35989e80f49a155977eede983603010bcc16040d
-SHA256: 2256ff66ce3c3fb130e52e5d7170e2ec2641af08b6a901c4be27cde4f6de34ae
+Size: 1544358
+MD5sum: 908ef88d58726e828bce8ecb9978f779
+SHA1: cfb5f5fe13c2c9912bc659daa26660c65ac7f1cf
+SHA256: 9817579e7929481f26e8a3c646bb82c0d3049d5d4ddb51d1502c3151c0c51dfb
 Section: games
 Priority: optional
 Description: melonDS Nintendo DS Emulator (ARM64 L4T build)
@@ -3288,10 +3288,10 @@ Architecture: arm64
 Maintainer: Ethiquema <noreply@ethiquema.github.io>
 Depends: bash
 Filename: pool/main/setperf_1.0.0_arm64.deb
-Size: 4124
-MD5sum: 2949fe9c9d97b117c09ae87a2d40b6fc
-SHA1: b47ee05c7de221cb1ee3463224b4aa3ad2f003af
-SHA256: 4a4242bceea85169610df407faa81cf132658a8fe27d3274727c0272025e75a7
+Size: 4122
+MD5sum: 044c2f3fee9e888e9b0efb4186793436
+SHA1: ef4cfe44d81bb364516356ca78e0afc8efd9b921
+SHA256: 41804b8774d4ea1acafd05c580aeac2c5610d867933a94d22c9bd8587a21af3b
 Section: utils
 Priority: optional
 Description: Nintendo Switch performance tuning wrapper
