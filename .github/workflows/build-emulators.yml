@@ -656,7 +656,7 @@ jobs:
           Version: ${PKG_VERSION}
           Architecture: arm64
           Maintainer: Ethiquema <noreply@ethiquema.github.io>
-          Depends: libc6, libjemalloc2, libqt6widgets6, libqt6gui6, libqt6core6, libavcodec60, libavformat60, libswscale7, libevdev2, libminiupnpc17, libmbedtls21, libcurl4t64, libhidapi-hidraw0, libsystemd0, libbluetooth3, libasound2t64, libpulse0, libpugixml1v5, libbz2-1.0, libzstd1, liblzo2-2, libpng16-16t64, libusb-1.0-0, libfmt9, libsfml-system2.6, libsfml-network2.6, libxxhash0, libspng0
+          Depends: libc6, libjemalloc2, libqt6widgets6, libqt6gui6, libqt6core6, libavcodec60, libavformat60, libswscale7, libevdev2, libminiupnpc17, libmbedtls14, libcurl4t64, libhidapi-hidraw0, libsystemd0, libbluetooth3, libasound2t64, libpulse0, libpugixml1v5, libbz2-1.0, libzstd1, liblzo2-2, libpng16-16t64, libusb-1.0-0, libfmt9, libsfml-system2.6, libsfml-network2.6, libxxhash0, libspng0
           Section: games
           Priority: optional
           Description: Dolphin GameCube/Wii Emulator (ARM64 L4T build)
