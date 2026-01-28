@@ -39,7 +39,9 @@ jobs:
       build_melonds: ${{ steps.decide.outputs.build_melonds }}
       build_ppsspp: ${{ steps.decide.outputs.build_ppsspp }}
       build_xemu: ${{ steps.decide.outputs.build_xemu }}
-      build_libretro_heavy: ${{ steps.decide.outputs.build_libretro_heavy }}
+      build_libretro_heavy_1: ${{ steps.decide.outputs.build_libretro_heavy_1 }}
+      build_libretro_heavy_2: ${{ steps.decide.outputs.build_libretro_heavy_2 }}
+      build_libretro_heavy_3: ${{ steps.decide.outputs.build_libretro_heavy_3 }}
       build_libretro_light: ${{ steps.decide.outputs.build_libretro_light }}
       build_duck_deps: ${{ steps.decide.outputs.build_duck_deps }}
       build_setperf: ${{ steps.decide.outputs.build_setperf }}
@@ -51,7 +53,9 @@ jobs:
       hash_melonds: ${{ steps.hashes.outputs.hash_melonds }}
       hash_ppsspp: ${{ steps.hashes.outputs.hash_ppsspp }}
       hash_xemu: ${{ steps.hashes.outputs.hash_xemu }}
-      hash_libretro_heavy: ${{ steps.hashes.outputs.hash_libretro_heavy }}
+      hash_libretro_heavy_1: ${{ steps.hashes.outputs.hash_libretro_heavy_1 }}
+      hash_libretro_heavy_2: ${{ steps.hashes.outputs.hash_libretro_heavy_2 }}
+      hash_libretro_heavy_3: ${{ steps.hashes.outputs.hash_libretro_heavy_3 }}
       hash_libretro_light: ${{ steps.hashes.outputs.hash_libretro_light }}
       hash_setperf: ${{ steps.hashes.outputs.hash_setperf }}
     steps:
@@ -79,7 +83,9 @@ jobs:
           echo "hash_melonds=$(job_hash 'build-melonds')" >> $GITHUB_OUTPUT
           echo "hash_ppsspp=$(job_hash 'build-ppsspp')" >> $GITHUB_OUTPUT
           echo "hash_xemu=$(job_hash 'build-xemu')" >> $GITHUB_OUTPUT
-          echo "hash_libretro_heavy=$(job_hash 'build-libretro-heavy')" >> $GITHUB_OUTPUT
+          echo "hash_libretro_heavy_1=$(job_hash 'build-libretro-heavy-1')" >> $GITHUB_OUTPUT
+          echo "hash_libretro_heavy_2=$(job_hash 'build-libretro-heavy-2')" >> $GITHUB_OUTPUT
+          echo "hash_libretro_heavy_3=$(job_hash 'build-libretro-heavy-3')" >> $GITHUB_OUTPUT
           echo "hash_libretro_light=$(job_hash 'build-libretro-light')" >> $GITHUB_OUTPUT
           echo "hash_setperf=$(job_hash 'build-setperf')" >> $GITHUB_OUTPUT
 
@@ -154,12 +160,28 @@ jobs:
           key: success-xemu-${{ steps.hashes.outputs.hash_xemu }}
           lookup-only: true
 
-      - name: Check libretro-heavy marker
-        id: marker-libretro-heavy
+      - name: Check libretro-heavy-1 marker
+        id: marker-libretro-heavy-1
         uses: actions/cache/restore@v4
         with:
           path: /tmp/marker
-          key: success-libretro-heavy-${{ steps.hashes.outputs.hash_libretro_heavy }}
+          key: success-libretro-heavy-1-${{ steps.hashes.outputs.hash_libretro_heavy_1 }}
+          lookup-only: true
+
+      - name: Check libretro-heavy-2 marker
+        id: marker-libretro-heavy-2
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/marker
+          key: success-libretro-heavy-2-${{ steps.hashes.outputs.hash_libretro_heavy_2 }}
+          lookup-only: true
+
+      - name: Check libretro-heavy-3 marker
+        id: marker-libretro-heavy-3
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/marker
+          key: success-libretro-heavy-3-${{ steps.hashes.outputs.hash_libretro_heavy_3 }}
           lookup-only: true
 
       - name: Check libretro-light marker
@@ -293,8 +315,10 @@ jobs:
             fi
           }
 
-          # Libretro heavy and light are independent
-          decide_no_ver libretro_heavy "${{ steps.marker-libretro-heavy.outputs.cache-hit }}"
+          # Libretro heavy (split into 3) and light are independent
+          decide_no_ver libretro_heavy_1 "${{ steps.marker-libretro-heavy-1.outputs.cache-hit }}"
+          decide_no_ver libretro_heavy_2 "${{ steps.marker-libretro-heavy-2.outputs.cache-hit }}"
+          decide_no_ver libretro_heavy_3 "${{ steps.marker-libretro-heavy-3.outputs.cache-hit }}"
           decide_no_ver libretro_light "${{ steps.marker-libretro-light.outputs.cache-hit }}"
 
           # DuckStation deps separate from DuckStation build
@@ -1568,10 +1592,11 @@ jobs:
               ref: 'main'
             });
 
-  # Libretro cores - Job 1: Heavy cores (FBNeo, MAME, VICE, DOSBox)
-  build-libretro-heavy:
+  # Libretro heavy cores split into 3 jobs to stay under 6h limit
+
+  build-libretro-heavy-1:
     needs: prepare
-    if: needs.prepare.outputs.build_libretro_heavy == 'true'
+    if: needs.prepare.outputs.build_libretro_heavy_1 == 'true'
     runs-on: ubuntu-24.04
     steps:
       - name: Set up QEMU
@@ -1591,32 +1616,29 @@ jobs:
       - name: Restore ccache
         uses: actions/cache/restore@v4
         with:
-          path: /tmp/ccache-libretro-heavy
-          key: ccache-libretro-heavy-v1
+          path: /tmp/ccache-libretro-heavy-1
+          key: ccache-libretro-heavy-1-v1
           restore-keys: |
-            ccache-libretro-heavy-
+            ccache-libretro-heavy-1-
 
-      - name: Build heavy Libretro cores
+      - name: Build heavy cores (batch 1)
         id: build
         run: |
-          mkdir -p /tmp/ccache-libretro-heavy
+          mkdir -p /tmp/ccache-libretro-heavy-1
 
           cat > /tmp/build-heavy.sh << 'SCRIPT'
           set -e
-
           export PATH="/usr/lib/ccache:$PATH"
           export CCACHE_MAXSIZE=5G
           ccache -z
 
-          # ARM64 build flags for Tegra X1 with ThinLTO
           export CFLAGS="-O3 -flto=auto -march=armv8-a+crc+simd -mtune=cortex-a57"
           export CXXFLAGS="-O3 -flto=auto -march=armv8-a+crc+simd -mtune=cortex-a57"
           export LDFLAGS="-flto=auto -shared -ljemalloc"
 
           CORES_DIR=/workspace/libretro-cores
-          PKG_DIR=/workspace/cores-heavy
+          PKG_DIR=/workspace/cores-heavy-1
           mkdir -p "$CORES_DIR" "$PKG_DIR"
-
           cd "$CORES_DIR"
 
           build_core() {
@@ -1627,7 +1649,6 @@ jobs:
 
             echo "=== Building $name ==="
             if [[ -d "$name" ]] && [[ -f "$name/.gitmodules" ]] && [[ -z "$(ls -A "$name/libretro-common" 2>/dev/null)" ]]; then
-              echo "Submodules missing in cached $name, re-cloning..."
               rm -rf "$name"
             fi
             if [[ ! -d "$name" ]]; then
@@ -1637,52 +1658,38 @@ jobs:
               fi
             fi
             cd "$name"
-            if [[ -n "$subdir" ]]; then
-              cd "$subdir"
-            fi
+            [[ -n "$subdir" ]] && cd "$subdir"
             make clean 2>/dev/null || true
-            # Don't pass CFLAGS/CXXFLAGS as make args (overrides Makefile include paths)
-            # They are already exported as env vars, Makefiles will append to them
             timeout ${BUILD_TIMEOUT}s make -j$(nproc) platform=unix $make_args \
               CC="ccache gcc" CXX="ccache g++" \
               LDFLAGS="$LDFLAGS" SKIPDEPEND=1 WERROR=0 || {
               EXIT_CODE=$?
-              if [[ $EXIT_CODE -eq 124 ]]; then
-                echo "TIMEOUT on $name"
-                exit 124
-              fi
+              [[ $EXIT_CODE -eq 124 ]] && echo "TIMEOUT on $name" && exit 124
               exit $EXIT_CODE
             }
             find . -name "*.so" -exec cp {} "$PKG_DIR/" \;
             cd "$CORES_DIR"
           }
 
-          # Heavy cores (long compile times)
+          # Batch 1: MAME, VICE, DOSBox, Saturn
           build_core mame2003-plus-libretro mame2003-plus
           build_core vice-libretro vice "" "EMUTYPE=x64"
           build_core dosbox-pure dosbox-pure
           build_core beetle-saturn-libretro beetle-saturn
-          build_core flycast flycast "" "HAVE_GENERIC_JIT=0"
-          build_core scummvm scummvm "backends/platform/libretro"
-          build_core desmume desmume "desmume/src/frontend/libretro"
-          build_core yabause yabause "yabause/src/libretro" "HAVE_SSE=0"
-          build_core mupen64plus-libretro-nx mupen64plus-next
-          build_core parallel-n64 parallel-n64
-          build_core beetle-psx-libretro beetle-psx
 
           ccache -s
-          echo "completed" > /workspace/build-status-heavy
+          echo "completed" > /workspace/build-status-heavy-1
           SCRIPT
 
           docker run --rm --platform linux/arm64 \
             -v ${{ github.workspace }}:/workspace \
-            -v /tmp/ccache-libretro-heavy:/ccache \
+            -v /tmp/ccache-libretro-heavy-1:/ccache \
             -v /tmp/build-heavy.sh:/build.sh:ro \
             -e CCACHE_DIR=/ccache \
             -e BUILD_TIMEOUT=${{ env.BUILD_TIMEOUT }} \
             emu-deps-image bash /build.sh
 
-          if [[ -f build-status-heavy ]] && [[ "$(cat build-status-heavy)" == "completed" ]]; then
+          if [[ -f build-status-heavy-1 ]] && [[ "$(cat build-status-heavy-1)" == "completed" ]]; then
             echo "completed=true" >> $GITHUB_OUTPUT
           else
             echo "completed=false" >> $GITHUB_OUTPUT
@@ -1692,15 +1699,15 @@ jobs:
         uses: actions/cache/save@v4
         if: always()
         with:
-          path: /tmp/ccache-libretro-heavy
-          key: ccache-libretro-heavy-v1-${{ github.run_id }}
+          path: /tmp/ccache-libretro-heavy-1
+          key: ccache-libretro-heavy-1-v1-${{ github.run_id }}
 
       - name: Upload cores
         if: steps.build.outputs.completed == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: libretro-cores-heavy
-          path: "cores-heavy/*.so"
+          name: libretro-cores-heavy-1
+          path: "cores-heavy-1/*.so"
           retention-days: 1
 
       - name: Save success marker
@@ -1712,19 +1719,260 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: /tmp/marker
-          key: success-libretro-heavy-${{ needs.prepare.outputs.hash_libretro_heavy }}
+          key: success-libretro-heavy-1-${{ needs.prepare.outputs.hash_libretro_heavy_1 }}
 
-      - name: Trigger retry if timeout
-        if: steps.build.outputs.completed == 'false'
-        uses: actions/github-script@v7
+  build-libretro-heavy-2:
+    needs: prepare
+    if: needs.prepare.outputs.build_libretro_heavy_2 == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
         with:
-          script: |
-            await github.rest.actions.createWorkflowDispatch({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              workflow_id: 'build-emulators.yml',
-              ref: 'main'
-            });
+          platforms: arm64
+
+      - name: Restore cached image
+        uses: actions/cache@v4
+        with:
+          path: /tmp/emu-deps.tar
+          key: ${{ env.CACHE_KEY }}
+
+      - name: Load image
+        run: docker load -i /tmp/emu-deps.tar
+
+      - name: Restore ccache
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/ccache-libretro-heavy-2
+          key: ccache-libretro-heavy-2-v1
+          restore-keys: |
+            ccache-libretro-heavy-2-
+
+      - name: Build heavy cores (batch 2)
+        id: build
+        run: |
+          mkdir -p /tmp/ccache-libretro-heavy-2
+
+          cat > /tmp/build-heavy.sh << 'SCRIPT'
+          set -e
+          export PATH="/usr/lib/ccache:$PATH"
+          export CCACHE_MAXSIZE=5G
+          ccache -z
+
+          export CFLAGS="-O3 -flto=auto -march=armv8-a+crc+simd -mtune=cortex-a57"
+          export CXXFLAGS="-O3 -flto=auto -march=armv8-a+crc+simd -mtune=cortex-a57"
+          export LDFLAGS="-flto=auto -shared -ljemalloc"
+
+          CORES_DIR=/workspace/libretro-cores
+          PKG_DIR=/workspace/cores-heavy-2
+          mkdir -p "$CORES_DIR" "$PKG_DIR"
+          cd "$CORES_DIR"
+
+          build_core() {
+            local repo=$1
+            local name=$2
+            local subdir=${3:-}
+            local make_args=${4:-}
+
+            echo "=== Building $name ==="
+            if [[ -d "$name" ]] && [[ -f "$name/.gitmodules" ]] && [[ -z "$(ls -A "$name/libretro-common" 2>/dev/null)" ]]; then
+              rm -rf "$name"
+            fi
+            if [[ ! -d "$name" ]]; then
+              if ! git clone --depth 1 --recursive "https://github.com/libretro/$repo.git" "$name"; then
+                echo "ERROR: Failed to clone $repo, skipping $name..."
+                return 1
+              fi
+            fi
+            cd "$name"
+            [[ -n "$subdir" ]] && cd "$subdir"
+            make clean 2>/dev/null || true
+            timeout ${BUILD_TIMEOUT}s make -j$(nproc) platform=unix $make_args \
+              CC="ccache gcc" CXX="ccache g++" \
+              LDFLAGS="$LDFLAGS" SKIPDEPEND=1 WERROR=0 || {
+              EXIT_CODE=$?
+              [[ $EXIT_CODE -eq 124 ]] && echo "TIMEOUT on $name" && exit 124
+              exit $EXIT_CODE
+            }
+            find . -name "*.so" -exec cp {} "$PKG_DIR/" \;
+            cd "$CORES_DIR"
+          }
+
+          # Batch 2: Flycast, ScummVM, DeSmuME, Yabause
+          build_core flycast flycast "" "HAVE_GENERIC_JIT=0"
+          build_core scummvm scummvm "backends/platform/libretro"
+          build_core desmume desmume "desmume/src/frontend/libretro"
+          build_core yabause yabause "yabause/src/libretro" "HAVE_SSE=0"
+
+          ccache -s
+          echo "completed" > /workspace/build-status-heavy-2
+          SCRIPT
+
+          docker run --rm --platform linux/arm64 \
+            -v ${{ github.workspace }}:/workspace \
+            -v /tmp/ccache-libretro-heavy-2:/ccache \
+            -v /tmp/build-heavy.sh:/build.sh:ro \
+            -e CCACHE_DIR=/ccache \
+            -e BUILD_TIMEOUT=${{ env.BUILD_TIMEOUT }} \
+            emu-deps-image bash /build.sh
+
+          if [[ -f build-status-heavy-2 ]] && [[ "$(cat build-status-heavy-2)" == "completed" ]]; then
+            echo "completed=true" >> $GITHUB_OUTPUT
+          else
+            echo "completed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Save ccache
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: /tmp/ccache-libretro-heavy-2
+          key: ccache-libretro-heavy-2-v1-${{ github.run_id }}
+
+      - name: Upload cores
+        if: steps.build.outputs.completed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: libretro-cores-heavy-2
+          path: "cores-heavy-2/*.so"
+          retention-days: 1
+
+      - name: Save success marker
+        if: steps.build.outputs.completed == 'true'
+        run: mkdir -p /tmp/marker && echo ok > /tmp/marker/ok
+
+      - name: Upload success marker
+        if: steps.build.outputs.completed == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: /tmp/marker
+          key: success-libretro-heavy-2-${{ needs.prepare.outputs.hash_libretro_heavy_2 }}
+
+  build-libretro-heavy-3:
+    needs: prepare
+    if: needs.prepare.outputs.build_libretro_heavy_3 == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Restore cached image
+        uses: actions/cache@v4
+        with:
+          path: /tmp/emu-deps.tar
+          key: ${{ env.CACHE_KEY }}
+
+      - name: Load image
+        run: docker load -i /tmp/emu-deps.tar
+
+      - name: Restore ccache
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/ccache-libretro-heavy-3
+          key: ccache-libretro-heavy-3-v1
+          restore-keys: |
+            ccache-libretro-heavy-3-
+
+      - name: Build heavy cores (batch 3)
+        id: build
+        run: |
+          mkdir -p /tmp/ccache-libretro-heavy-3
+
+          cat > /tmp/build-heavy.sh << 'SCRIPT'
+          set -e
+          export PATH="/usr/lib/ccache:$PATH"
+          export CCACHE_MAXSIZE=5G
+          ccache -z
+
+          export CFLAGS="-O3 -flto=auto -march=armv8-a+crc+simd -mtune=cortex-a57"
+          export CXXFLAGS="-O3 -flto=auto -march=armv8-a+crc+simd -mtune=cortex-a57"
+          export LDFLAGS="-flto=auto -shared -ljemalloc"
+
+          CORES_DIR=/workspace/libretro-cores
+          PKG_DIR=/workspace/cores-heavy-3
+          mkdir -p "$CORES_DIR" "$PKG_DIR"
+          cd "$CORES_DIR"
+
+          build_core() {
+            local repo=$1
+            local name=$2
+            local subdir=${3:-}
+            local make_args=${4:-}
+
+            echo "=== Building $name ==="
+            if [[ -d "$name" ]] && [[ -f "$name/.gitmodules" ]] && [[ -z "$(ls -A "$name/libretro-common" 2>/dev/null)" ]]; then
+              rm -rf "$name"
+            fi
+            if [[ ! -d "$name" ]]; then
+              if ! git clone --depth 1 --recursive "https://github.com/libretro/$repo.git" "$name"; then
+                echo "ERROR: Failed to clone $repo, skipping $name..."
+                return 1
+              fi
+            fi
+            cd "$name"
+            [[ -n "$subdir" ]] && cd "$subdir"
+            make clean 2>/dev/null || true
+            timeout ${BUILD_TIMEOUT}s make -j$(nproc) platform=unix $make_args \
+              CC="ccache gcc" CXX="ccache g++" \
+              LDFLAGS="$LDFLAGS" SKIPDEPEND=1 WERROR=0 || {
+              EXIT_CODE=$?
+              [[ $EXIT_CODE -eq 124 ]] && echo "TIMEOUT on $name" && exit 124
+              exit $EXIT_CODE
+            }
+            find . -name "*.so" -exec cp {} "$PKG_DIR/" \;
+            cd "$CORES_DIR"
+          }
+
+          # Batch 3: N64 and PSX cores
+          build_core mupen64plus-libretro-nx mupen64plus-next
+          build_core parallel-n64 parallel-n64
+          build_core beetle-psx-libretro beetle-psx
+
+          ccache -s
+          echo "completed" > /workspace/build-status-heavy-3
+          SCRIPT
+
+          docker run --rm --platform linux/arm64 \
+            -v ${{ github.workspace }}:/workspace \
+            -v /tmp/ccache-libretro-heavy-3:/ccache \
+            -v /tmp/build-heavy.sh:/build.sh:ro \
+            -e CCACHE_DIR=/ccache \
+            -e BUILD_TIMEOUT=${{ env.BUILD_TIMEOUT }} \
+            emu-deps-image bash /build.sh
+
+          if [[ -f build-status-heavy-3 ]] && [[ "$(cat build-status-heavy-3)" == "completed" ]]; then
+            echo "completed=true" >> $GITHUB_OUTPUT
+          else
+            echo "completed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Save ccache
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: /tmp/ccache-libretro-heavy-3
+          key: ccache-libretro-heavy-3-v1-${{ github.run_id }}
+
+      - name: Upload cores
+        if: steps.build.outputs.completed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: libretro-cores-heavy-3
+          path: "cores-heavy-3/*.so"
+          retention-days: 1
+
+      - name: Save success marker
+        if: steps.build.outputs.completed == 'true'
+        run: mkdir -p /tmp/marker && echo ok > /tmp/marker/ok
+
+      - name: Upload success marker
+        if: steps.build.outputs.completed == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: /tmp/marker
+          key: success-libretro-heavy-3-${{ needs.prepare.outputs.hash_libretro_heavy_3 }}
 
   # Libretro cores - Job 2: Light cores (computers, misc consoles)
   build-libretro-light:
@@ -1901,14 +2149,28 @@ jobs:
 
   # Package all libretro cores into single deb
   build-libretro-package:
-    needs: [build-libretro-heavy, build-libretro-light]
-    if: always() && (needs.build-libretro-heavy.result == 'success' || needs.build-libretro-light.result == 'success')
+    needs: [build-libretro-heavy-1, build-libretro-heavy-2, build-libretro-heavy-3, build-libretro-light]
+    if: always() && (needs.build-libretro-heavy-1.result == 'success' || needs.build-libretro-heavy-2.result == 'success' || needs.build-libretro-heavy-3.result == 'success' || needs.build-libretro-light.result == 'success')
     runs-on: ubuntu-24.04
     steps:
-      - name: Download heavy cores
+      - name: Download heavy-1 cores
         uses: actions/download-artifact@v4
         with:
-          name: libretro-cores-heavy
+          name: libretro-cores-heavy-1
+          path: cores/
+        continue-on-error: true
+
+      - name: Download heavy-2 cores
+        uses: actions/download-artifact@v4
+        with:
+          name: libretro-cores-heavy-2
+          path: cores/
+        continue-on-error: true
+
+      - name: Download heavy-3 cores
+        uses: actions/download-artifact@v4
+        with:
+          name: libretro-cores-heavy-3
           path: cores/
         continue-on-error: true
 
