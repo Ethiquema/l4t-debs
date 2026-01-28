@@ -2081,16 +2081,14 @@ Architecture: arm64
 Maintainer: Ethiquema <noreply@ethiquema.github.io>
 Depends: libc6, zlib1g, libjemalloc2
 Filename: pool/main/libretro-cores-l4t_1.0.0_arm64.deb
-Size: 11281992
-MD5sum: 4df07f399d85d7e84a2baf8741f41d59
-SHA1: c5b07a45827ea3826a66bcfeb4ef49320c4b3a10
-SHA256: 03e3886fda0754ecec24d660e4c4773c5cc0be51c7dc390ef2085bcb7b94b6aa
+Size: 1395776
+MD5sum: 8dbe5bb09b626128a402af68e2ae28d0
+SHA1: 06f1fad641833e20a1def84344e25a615f5285b6
+SHA256: e881c31d27d626fe583e614f2c7585e540da91c25020b9fee3269f80f8a28d21
 Section: games
 Priority: optional
-Description: Additional Libretro cores (ARM64 L4T build)
- FBNeo, VICE, DOSBox Pure, fMSX, blueMSX, PUAE, Fuse, Cap32,
- Atari800, PX68k, Quasi88, Opera, NeoCD, Virtual Jaguar, O2EM,
- VecX, FreeChaF, FreeIntv, Geolith, PrBoom, NXEngine, MAME 2003+
+Description: Libretro cores for RetroArch (ARM64 L4T build)
+ All standard libretro cores compiled for Tegra X1 ARM64.
 
 Package: libsdl2-2.0-0
 Source: libsdl2
