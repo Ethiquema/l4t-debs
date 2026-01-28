@@ -1798,10 +1798,9 @@ jobs:
             cd "$CORES_DIR"
           }
 
-          # Batch 2: Flycast, ScummVM, Yabause
+          # Batch 2: Flycast, ScummVM
           build_core flycast flycast "" "HAVE_GENERIC_JIT=0"
           build_core scummvm scummvm "backends/platform/libretro"
-          build_core yabause yabause "yabause/src/libretro" "HAVE_SSE=0"
 
           ccache -s
           echo "completed" > /workspace/build-status-heavy-2
@@ -1924,9 +1923,10 @@ jobs:
             cd "$CORES_DIR"
           }
 
-          # Batch 3: N64 and PSX cores
+          # Batch 3: N64, PSX and Saturn cores
           build_core mupen64plus-libretro-nx mupen64plus-next
           build_core beetle-psx-libretro beetle-psx
+          build_core yabause yabause "yabause/src/libretro" "HAVE_SSE=0"
 
           ccache -s
           echo "completed" > /workspace/build-status-heavy-3
