@@ -1662,7 +1662,7 @@ jobs:
           build_core vice-libretro vice "" "EMUTYPE=x64"
           build_core dosbox-pure dosbox-pure
           build_core beetle-saturn-libretro beetle-saturn
-          build_core flycast flycast
+          build_core flycast flycast "" "HAVE_GENERIC_JIT=0"
           build_core scummvm scummvm "backends/platform/libretro"
           build_core desmume desmume "desmume/src/frontend/libretro"
           build_core yabause yabause "yabause/src/libretro" "HAVE_SSE=0"
