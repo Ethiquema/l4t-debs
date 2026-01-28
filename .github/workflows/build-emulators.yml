@@ -1631,7 +1631,10 @@ jobs:
               rm -rf "$name"
             fi
             if [[ ! -d "$name" ]]; then
-              git clone --depth 1 --recursive "https://github.com/libretro/$repo.git" "$name"
+              if ! git clone --depth 1 --recursive "https://github.com/libretro/$repo.git" "$name"; then
+                echo "ERROR: Failed to clone $repo, skipping $name..."
+                return 1
+              fi
             fi
             cd "$name"
             if [[ -n "$subdir" ]]; then
@@ -1660,8 +1663,9 @@ jobs:
           build_core dosbox-pure dosbox-pure
           build_core beetle-saturn-libretro beetle-saturn
           build_core flycast flycast
-          build_core scummvm scummvm
-          build_core yabause yabause "" "HAVE_SSE=0"
+          build_core scummvm scummvm "backends/platform/libretro"
+          build_core desmume desmume "desmume/src/frontend/libretro"
+          build_core yabause yabause "yabause/src/libretro" "HAVE_SSE=0"
           build_core mupen64plus-libretro-nx mupen64plus-next
           build_core parallel-n64 parallel-n64
           build_core beetle-psx-libretro beetle-psx
@@ -1790,7 +1794,10 @@ jobs:
                   rm -rf "$name"
                 fi
                 if [[ ! -d "$name" ]]; then
-                  git clone --depth 1 --recursive "https://github.com/libretro/$repo.git" "$name"
+                  if ! git clone --depth 1 --recursive "https://github.com/libretro/$repo.git" "$name"; then
+                    echo "WARNING: Failed to clone $repo, skipping $name..."
+                    return 0
+                  fi
                 fi
                 cd "$name"
                 if [[ -n "$subdir" ]]; then
@@ -1832,9 +1839,7 @@ jobs:
               build_core beetle-supergrafx-libretro beetle-supergrafx
               build_core beetle-vb-libretro beetle-vb
               build_core beetle-wswan-libretro beetle-wswan
-              build_core bsnes-mercury bsnes-mercury-balanced "" "PROFILE=balanced"
-              build_core bsnes-mercury bsnes-mercury-performance "" "PROFILE=performance"
-              build_core fceumm-libretro fceumm
+              build_core libretro-fceumm fceumm
               build_core gambatte-libretro gambatte
               build_core Genesis-Plus-GX genesis-plus-gx
               build_core gpsp gpsp
@@ -1842,16 +1847,14 @@ jobs:
               build_core beetle-gba-libretro mednafen-gba
               build_core beetle-ngp-libretro mednafen-ngp
               build_core beetle-pce-libretro mednafen-pce
-              build_core beetle-bsnes-libretro mednafen-snes
-              build_core beetle-wswan-libretro mednafen-wswan
               build_core mgba mgba
-              build_core nestopia nestopia "" "core=libretro"
+              build_core nestopia nestopia "libretro"
               build_core pcsx_rearmed pcsx-rearmed
               build_core picodrive picodrive
               build_core prosystem-libretro prosystem
               build_core QuickNES_Core quicknes
-              build_core SameBoy sameboy "" "FRONTEND=libretro"
-              build_core snes9x snes9x "" "core=libretro"
+              build_core SameBoy sameboy "libretro"
+              build_core snes9x snes9x "libretro"
               build_core stella2014-libretro stella
               build_core tgbdual-libretro tgbdual
               build_core vba-next vba-next
