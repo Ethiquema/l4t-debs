@@ -194,17 +194,17 @@ Description: APT configuration snippet to enable large HiDPI icon downloads
  decide to fetch them on-demand from a web location.
 
 Package: azahar-emu-l4t
-Version: 2124.2
+Version: 2124.3
 Architecture: arm64
 Maintainer: Ethiquema <noreply@ethiquema.github.io>
 Depends: libc6, libjemalloc2, libqt6widgets6, libqt6gui6, libqt6core6, libqt6multimedia6, libqt6opengl6, libsdl2-2.0-0, libssl3t64, libavcodec60, libavformat60, libswscale7, libspeexdsp1, libfmt9, libzstd1, libusb-1.0-0, libhidapi-hidraw0, libboost-serialization1.83.0, libenet7, liblz4-1
 Replaces: citra
 Provides: citra
-Filename: pool/main/azahar-emu-l4t_2124.2_arm64.deb
-Size: 11519570
-MD5sum: b5d3d4fa3f87464eb2d015c456284bfb
-SHA1: 390fa5313375e3783c665a764aa8c7bf16befe44
-SHA256: c61de2d8c7bdd176a254830e4f20ffaaf9aeb245800c9b3e07937f6c20a10423
+Filename: pool/main/azahar-emu-l4t_2124.3_arm64.deb
+Size: 11515066
+MD5sum: 2fb6821750f8aa4099a0bcea06375461
+SHA1: bee77b8bae0932e9fa61c5c11d10db0ffa0babcd
+SHA256: 53b49e0ebd5e19d81825e5718b20d73ec3ddcf28afc4a8aca48c390c01d88f21
 Section: games
 Priority: optional
 Description: Azahar 3DS Emulator (ARM64 L4T build)
