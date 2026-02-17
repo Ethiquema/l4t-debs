@@ -3,9 +3,6 @@ name: Update L4T APT Repository
 on:
   push:
     branches: [main]
-  schedule:
-    # Run every 24 hours at 3am UTC
-    - cron: '0 3 * * *'
   workflow_dispatch:
     # Allow manual trigger
 
